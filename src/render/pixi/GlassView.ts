@@ -44,6 +44,7 @@ export class GlassView{
   private invalid=outline('#ff8e94',3,'#ffb0b5',1.4);
   private highlight=new Graphics().moveTo(-25,14).lineTo(-25,123).stroke({color:'#ffffff52',width:2});
   private glows:{selected:Sprite;hintSource:Sprite;hintTarget:Sprite;invalid:Sprite};
+  private glowList:Sprite[]=[];
 
   constructor(){
     this.shadow.position.set(-90,-36);
@@ -59,7 +60,8 @@ export class GlassView{
       hintTarget:new Sprite(makeGlowTexture('#83e0d4',2.4,16)),
       invalid:new Sprite(makeGlowTexture('#ff8e94',3,12)),
     };
-    for(const g of Object.values(this.glows)){
+    this.glowList=[this.glows.selected,this.glows.hintSource,this.glows.hintTarget,this.glows.invalid];
+    for(const g of this.glowList){
       g.position.set(-90,-36);
       g.width=180;
       g.height=230;
@@ -67,7 +69,7 @@ export class GlassView{
     }
     this.clipped.addChild(this.liquid.root,this.shine);
     this.clipped.mask=this.clip;
-    this.root.addChild(this.shadow,this.body,this.clip,this.clipped,...Object.values(this.glows),this.normal,this.selected,this.invalid,this.highlight);
+    this.root.addChild(this.shadow,this.body,this.clip,this.clipped,...this.glowList,this.normal,this.selected,this.invalid,this.highlight);
     this.selected.visible=this.invalid.visible=false;
   }
 
@@ -75,7 +77,7 @@ export class GlassView{
     this.root.position.set(frame.pose.x,frame.pose.y);
     this.root.rotation=frame.pose.angle;
     this.liquid.update(frame);
-    for(const g of Object.values(this.glows))g.visible=false;
+    for(const g of this.glowList)g.visible=false;
     this.normal.visible=!frame.invalid&&!frame.selected;
     this.selected.visible=frame.selected&&!frame.invalid;
     this.invalid.visible=frame.invalid;

@@ -1,8 +1,6 @@
-# STILLLIGHT Stage 2 — Astra Review Candidate
+# STILLLIGHT Stage 2 — Milestone 1 Corrected Candidate
 
-This package is the implementation candidate to audit against the previously supplied golden Canvas reference, reference video, and Astra Max architecture recommendation.
-
-This review copy intentionally omits implementer verification claims and generated parity results. Audit the code, tests, harness, and runtime independently.
+This package contains the Stage-2 Milestone-1 implementation with the C1–C7 correction pass applied. The untouched supplied Canvas reference remains under `reference/original/` and is not used as the production fallback.
 
 ## Run
 
@@ -19,7 +17,13 @@ Main candidate: http://127.0.0.1:5179/
 
 Parity/debug harness: http://127.0.0.1:5179/debug.html
 
-## Independent checks available
+## Renderer policy
+
+Production prefers PixiJS WebGL. If WebGL is unavailable or Pixi WebGL initialization fails, the app selects the explicit Canvas2D adapter in `src/render/CanvasRenderer.ts`, which consumes the same authored `RenderFrame` data.
+
+Rendering remains demand-driven. The viewport controller owns responsive dimensions and capped DPR coordination, and deterministic parity mode owns candidate time while active.
+
+## Checks
 
 ```bash
 npm test
@@ -28,4 +32,4 @@ npm run build
 npm run parity:capture
 ```
 
-The untouched supplied Canvas reference source is under `reference/original/`. The implementation candidate is under `src/`. The parity harness source is under `src/debug/`, `debug.html`, and `scripts/capture-parity.mjs`.
+The parity harness source is under `src/debug/`, `debug.html`, and `scripts/capture-parity.mjs`.
