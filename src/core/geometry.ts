@@ -1,0 +1,17 @@
+import { EDGE_MARGIN,GLASS_HALF_WIDTH,GLASS_HEIGHT,H,SELECT_LIFT,W } from './constants.ts';
+export type Pose={x:number;y:number;angle:number}; export type Point={x:number;y:number};
+const GLASS_CORNERS=[[-GLASS_HALF_WIDTH,0],[GLASS_HALF_WIDTH,0],[GLASS_HALF_WIDTH,GLASS_HEIGHT],[-GLASS_HALF_WIDTH,GLASS_HEIGHT]] as const;
+export const position=(index:number)=>({x:80+(index%3)*120,y:130+Math.floor(index/3)*242});
+export const clamp01=(v:number)=>Math.max(0,Math.min(1,v));
+export const smooth=(v:number)=>{const t=clamp01(v);return t*t*(3-2*t)};
+export const smoother=(v:number)=>{const t=clamp01(v);return t*t*t*(t*(t*6-15)+10)};
+export const easeOutCubic=(v:number)=>1-Math.pow(1-clamp01(v),3);
+export function transformedGlassCorners(pose:Pose){const c=Math.cos(pose.angle),s=Math.sin(pose.angle);return GLASS_CORNERS.map(([x,y])=>({x:pose.x+x*c-y*s,y:pose.y+x*s+y*c}));}
+export function clampPose(pose:Pose):Pose{const cs=transformedGlassCorners(pose);const minX=Math.min(...cs.map(p=>p.x)),maxX=Math.max(...cs.map(p=>p.x)),minY=Math.min(...cs.map(p=>p.y)),maxY=Math.max(...cs.map(p=>p.y));let {x,y}=pose;if(minX<EDGE_MARGIN)x+=EDGE_MARGIN-minX;if(maxX>W-EDGE_MARGIN)x-=maxX-(W-EDGE_MARGIN);if(minY<EDGE_MARGIN)y+=EDGE_MARGIN-minY;if(maxY>H-EDGE_MARGIN)y-=maxY-(H-EDGE_MARGIN);return{x,y,angle:pose.angle};}
+export function pourDirection(source:number,target:number){const s=position(source),t=position(target);if(t.x<W/2)return-1;if(t.x>W/2)return 1;if(s.x!==t.x)return s.x<t.x?1:-1;return source<target?1:-1;}
+export const tiltForUnits=(remaining:number)=>Math.max(.78,Math.min(1.565,1.59-Math.max(0,remaining)*.19));
+export function movingPose(source:number,target:number,progress:number,remaining:number):Pose{const home=position(source),dest=position(target),direction=pourDirection(source,target),p=clamp01(progress);const approach=smoother(p/.28),retreat=smoother((p-.70)/.30),presence=approach*(1-retreat);const tiltIn=smoother((p-.10)/.22),tiltOut=smoother((p-.68)/.20),angle=direction*tiltForUnits(remaining)*tiltIn*(1-tiltOut);const lipOffsetX=direction*GLASS_HALF_WIDTH*Math.cos(angle),pourCenterX=dest.x-lipOffsetX,sameRow=Math.floor(source/3)===Math.floor(target/3),pourCenterY=dest.y-(sameRow?82:135);const startY=home.y-SELECT_LIFT,returnToSlot=SELECT_LIFT*smoother((p-.80)/.20),travelArc=-9*Math.sin(Math.PI*Math.min(1,approach))*(1-retreat),returnSettle=p>.78?2.2*Math.sin((p-.78)/.22*Math.PI)*(1-p)/.22:0;return clampPose({x:home.x+(pourCenterX-home.x)*presence,y:startY+returnToSlot+(pourCenterY-startY)*presence+travelArc+returnSettle,angle});}
+export function selectedPose(index:number,progress=1):Pose{const home=position(index),t=clamp01(progress),lift=SELECT_LIFT*easeOutCubic(t),settle=t<1?Math.sin(t*Math.PI*3.2)*1.8*(1-t):0;return{x:home.x,y:home.y-lift+settle,angle:0};}
+export function invalidPose(index:number,progress:number,direction:number):Pose{const home=position(index),p=clamp01(progress),env=Math.pow(1-p,1.35),osc=Math.sin(p*Math.PI*5.4),returnHome=smoother((p-.70)/.30);return clampPose({x:home.x+direction*8.5*osc*env,y:home.y-SELECT_LIFT*(1-returnHome)+1.2*Math.sin(p*Math.PI*2)*env,angle:direction*.075*osc*env});}
+export function pouringLip(pose:Pose,direction:number):Point{const localX=direction*GLASS_HALF_WIDTH;return{x:pose.x+localX*Math.cos(pose.angle),y:pose.y+localX*Math.sin(pose.angle)}}
+export const streamControl=(start:Point,end:Point,direction:number):Point=>({x:(start.x+end.x)/2+direction*7,y:start.y+Math.max(16,(end.y-start.y)*.58)});

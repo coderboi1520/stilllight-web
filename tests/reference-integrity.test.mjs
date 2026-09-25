@@ -1,0 +1,3 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import crypto from 'node:crypto';import path from 'node:path';
+const root=new URL('../reference/original/',import.meta.url);const manifest=fs.readFileSync(new URL('../reference/original.sha256',import.meta.url),'utf8').trim().split('\n');
+test('golden reference source remains byte-identical to imported baseline',()=>{for(const line of manifest){const [hash,...nameParts]=line.trim().split(/\s+/);const rel=nameParts.join(' ');const bytes=fs.readFileSync(new URL(rel,root));const actual=crypto.createHash('sha256').update(bytes).digest('hex');assert.equal(actual,hash,rel);}});
