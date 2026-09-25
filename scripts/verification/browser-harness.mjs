@@ -3,9 +3,12 @@ import { mkdir, access } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { chromium } from 'playwright-core';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const execFileAsync = promisify(execFile);
 const exists = async p => { try { await access(p); return true; } catch { return false; } };
 
 export async function resolveChromiumExecutable() {
@@ -37,7 +40,9 @@ export async function withVerificationHarness(options, fn) {
     let baseURL = process.env.STILLLIGHT_URL;
     if (!baseURL) {
       baseURL = 'http://127.0.0.1:5179';
-      server = spawn(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'dev'], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+      server = process.platform === 'win32'
+        ? spawn(process.execPath, [path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js'), 'run', 'dev'], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
+        : spawn('npm', ['run', 'dev'], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
       let startupOutput = '';
       server.stdout.on('data', b => startupOutput += b.toString());
       server.stderr.on('data', b => startupOutput += b.toString());
@@ -80,7 +85,11 @@ export async function withVerificationHarness(options, fn) {
     throw error;
   } finally {
     if (browser) await browser.close().catch(() => {});
-    if (server) { server.kill(); }
+    if (server) {
+      if (process.platform === 'win32' && server.pid) {
+        try { await execFileAsync('taskkill', ['/pid', String(server.pid), '/t', '/f'], { windowsHide: true }); } catch {}
+      } else server.kill();
+    }
   }
 }
 
