@@ -23,7 +23,9 @@ export class PixiRenderer{
     configureAssetDensity(this.density);
     await this.app.init({width:W,height:H,resolution:this.density,autoDensity:true,antialias:true,background:'#071219',preference:'webgl',autoStart:false,sharedTicker:false});
     this.app.ticker.stop();
-    this.app.renderer.events.setTargetElement(null);
+    // Pixi documents null as the way to detach its DOM event target, while
+    // v8.18's TypeScript declaration still narrows the parameter to HTMLElement.
+    this.app.renderer.events.setTargetElement(null as unknown as HTMLElement);
     host.appendChild(this.app.canvas);
     this.app.stage.addChild(this.scene);
     this.rebuildViews(false);
