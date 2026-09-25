@@ -49,3 +49,24 @@ test('render hot path does not re-add scene children every frame',()=>{
   assert.doesNotMatch(renderBody,/addChild/);
   assert.match(renderer,/ensureDrawOrder/);
 });
+
+test('Pixi idle event RAF source is detached and context restoration invalidates explicitly',()=>{
+  const renderer=read('../src/render/pixi/PixiRenderer.ts');
+  assert.match(renderer,/renderer\.events\.setTargetElement\(null\)/);
+  assert.match(renderer,/webglcontextrestored/);
+  assert.match(renderer,/this\.onRestore\(\)/);
+  assert.doesNotMatch(renderer,/requestAnimationFrame/);
+});
+
+test('explicit Canvas fallback covers liquid, transform, stream and impact primitives',()=>{
+  const stage=read('../src/render/StageRenderer.ts');
+  const canvas=read('../src/render/CanvasRenderer.ts');
+  assert.match(stage,/selectBackend\(hasWebGL\)/);
+  assert.match(stage,/new CanvasRenderer\(\)/);
+  assert.match(canvas,/ctx\.rotate\(frame\.pose\.angle\)/);
+  assert.match(canvas,/layer\.wavy&&layer\.surface/);
+  assert.match(canvas,/quadraticCurveTo\(stream\.control\.x,stream\.control\.y,stream\.end\.x,stream\.end\.y\)/);
+  assert.match(canvas,/ctx\.lineCap='round'/);
+  assert.match(canvas,/ctx\.ellipse\(stream\.end\.x,stream\.end\.y\+1\.5/);
+  assert.match(canvas,/frame\.hintRole==='source'/);
+});

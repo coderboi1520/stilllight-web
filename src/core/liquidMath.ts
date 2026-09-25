@@ -1,8 +1,9 @@
 import { CAPACITY,GLASS_BOTTOM,GLASS_HALF_WIDTH,LIQUID_BAND,LIQUID_TOP_BASELINE,SURFACE_MAX_X,SURFACE_MIN_X,SURFACE_SEGMENTS,SURFACE_SAMPLES } from './constants.ts';
 const SCRATCH_A=new Float64Array(24),SCRATCH_B=new Float64Array(24);
+const VESSEL_RAW=new Float64Array([-GLASS_HALF_WIDTH,0,GLASS_HALF_WIDTH,0,GLASS_HALF_WIDTH,130,30,143,22,151,12,GLASS_BOTTOM,-12,GLASS_BOTTOM,-22,151,-30,143,-GLASS_HALF_WIDTH,130]);
 export const CANONICAL_AREAS=[0,2395,4573,6751,8929] as const;
 export const liquidTop=(units:number)=>LIQUID_TOP_BASELINE-units*LIQUID_BAND;
-export function vesselPolygon(angle:number,out=new Float64Array(20)){const raw=[-GLASS_HALF_WIDTH,0,GLASS_HALF_WIDTH,0,GLASS_HALF_WIDTH,130,30,143,22,151,12,GLASS_BOTTOM,-12,GLASS_BOTTOM,-22,151,-30,143,-GLASS_HALF_WIDTH,130];const c=Math.cos(angle),s=Math.sin(angle);for(let i=0;i<10;i++){const x=raw[i*2],y=raw[i*2+1];out[i*2]=x*c-y*s;out[i*2+1]=x*s+y*c;}return out;}
+export function vesselPolygon(angle:number,out=new Float64Array(20)){const c=Math.cos(angle),s=Math.sin(angle);for(let i=0;i<10;i++){const x=VESSEL_RAW[i*2],y=VESSEL_RAW[i*2+1];out[i*2]=x*c-y*s;out[i*2+1]=x*s+y*c;}return out;}
 function polygonArea(points:Float64Array,count:number){let sum=0;for(let i=0;i<count;i++){const j=(i+1)%count;sum+=points[i*2]*points[j*2+1]-points[i*2+1]*points[j*2];}return Math.abs(sum/2);}
 function belowArea(points:Float64Array,line:number){let count=0;for(let i=0;i<10;i++){const j=(i+1)%10,ax=points[i*2],ay=points[i*2+1],bx=points[j*2],by=points[j*2+1];if(ay>=line){SCRATCH_B[count*2]=ax;SCRATCH_B[count*2+1]=ay;count++;}if((ay>=line)!==(by>=line)){const t=(line-ay)/(by-ay);SCRATCH_B[count*2]=ax+t*(bx-ax);SCRATCH_B[count*2+1]=line;count++;}}return count<3?0:polygonArea(SCRATCH_B,count);}
 const BASE_POLY=vesselPolygon(0,SCRATCH_A),BASE_AREA=polygonArea(BASE_POLY,10);

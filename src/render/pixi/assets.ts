@@ -26,9 +26,17 @@ function drawRim(ctx:CanvasRenderingContext2D){
   ctx.ellipse(0,0,33,4.5,0,0,Math.PI*2);
 }
 
-function cappedDensity(){
-  return Math.min(typeof devicePixelRatio==='number'&&devicePixelRatio>0?devicePixelRatio:1,2);
+let assetDensity=Math.min(typeof devicePixelRatio==='number'&&devicePixelRatio>0?devicePixelRatio:1,2);
+export function configureAssetDensity(density:number){
+  const next=Math.max(1,Math.min(density||1,2));
+  if(Math.abs(next-assetDensity)<1e-6)return false;
+  assetDensity=next;
+  streamHaloTexture=null;
+  streamHaloCapTexture=null;
+  return true;
 }
+function cappedDensity(){return assetDensity;}
+
 
 function canvasTexture(draw:(ctx:CanvasRenderingContext2D)=>void,scale=2){
   const canvas=document.createElement('canvas');
