@@ -33,3 +33,9 @@ npm run parity:capture
 ```
 
 The parity harness source is under `src/debug/`, `debug.html`, and `scripts/capture-parity.mjs`.
+
+## Verification
+
+Run the standard gates with `npm run verify:fast`, `npm run verify:runtime`, `npm run verify:visual`, or the fail-fast full sequence `npm run verify:m1`. Targeted browser checks are available as `npm run verify:viewport`, `verify:context`, `verify:fallback`, `verify:idle-raf`, `verify:parity`, and `verify:pour`.
+
+Browser checks use the repository's Playwright setup and do not require computer-use. Set `CHROMIUM_PATH` to choose a Chrome/Edge/Chromium executable, or `STILLLIGHT_URL` to use an already-running candidate server. Generated diagnostics and screenshots are written under `artifacts/verification/`.

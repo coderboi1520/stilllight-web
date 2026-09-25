@@ -17,7 +17,7 @@ export async function run(harness) {
     });
     if(result.unsupported)return makeResult(name,'SKIPPED',started,'WEBGL_lose_context unavailable');
     await page.screenshot({path:`${dir}/restored.png`});artifacts.push(`${dir}/restored.png`);
-    if(result.state!==result.stateAfter||result.frame!==result.frameAfter||result.lostAfter||errors.length)throw Object.assign(new Error(`restore mismatch ${JSON.stringify(result)} errors=${errors.join('; ')}`),{artifacts});
+    if(result.state!==result.stateAfter||result.frame!==result.frameAfter||result.lostAfter||errors.length)throw Object.assign(new Error(`restore mismatch: lost=${result.lost}, restored=${result.restored}, contextLostAfter=${result.lostAfter}, statePreserved=${result.state===result.stateAfter}, framePreserved=${result.frame===result.frameAfter}, errors=${errors.map(e=>e.split('\n')[0]).join('; ')||'none'}`),{artifacts});
     return makeResult(name,'PASS',started,'context lost and restored; state preserved; context usable',artifacts);
   }catch(error){return makeResult(name,'FAIL',started,error.message,error.artifacts??artifacts)}finally{await item?.context.close().catch(()=>{})}
 }

@@ -7,33 +7,34 @@ export async function run(harness) {
   let pageCtx, dir, artifacts = [];
   try {
     dir = await harness.artifactDir('viewport-dpr');
-    pageCtx = await harness.newIsolatedPage({ width: 400, height: 620, dpr: 1 });
-    const { page, errors } = pageCtx;
-    await harness.goto(page);
-    await page.waitForSelector('#pixi-host canvas');
-    const inspect = () => page.evaluate(() => {
+    const inspect = page => page.evaluate(() => {
       const board = document.querySelector('.board').getBoundingClientRect(), canvas = document.querySelector('#pixi-host canvas');
       const rect = canvas.getBoundingClientRect();
       return { board: [board.width, board.height], css: [rect.width, rect.height], backing: [canvas.width, canvas.height], dpr: devicePixelRatio };
     });
     const cases = [];
     for (const [width, height, dpr, label] of [[400,620,1,'portrait-1x'],[320,496,2,'portrait-2x'],[620,400,1,'landscape']]) {
-      const metrics = await harness.setDeviceMetrics(page, { width,height,dpr }); await page.waitForTimeout(150);
-      const seen = await inspect(); cases.push({ label, ...seen }); await metrics.detach();
+      const isolated=await harness.newIsolatedPage({width,height,dpr}), testPage=isolated.page;
+      await harness.goto(testPage); await testPage.waitForSelector('#pixi-host canvas');
+      const seen = await inspect(testPage); cases.push({ label, ...seen });
       if (Math.abs(seen.css[0]-seen.board[0])>1 || Math.abs(seen.css[1]-seen.board[1])>1) throw new Error(`${label}: board/canvas CSS mismatch ${JSON.stringify(seen)}`);
       if (seen.backing[0] !== Math.round(seen.css[0]*Math.min(dpr,2)) || seen.backing[1] !== Math.round(seen.css[1]*Math.min(dpr,2))) throw new Error(`${label}: backing/DPR mismatch ${JSON.stringify(seen)}`);
       if (seen.dpr !== dpr) throw new Error(`${label}: expected DPR ${dpr}, got ${seen.dpr}`);
+      await isolated.context.close();
     }
+    pageCtx=await harness.newIsolatedPage({width:400,height:620,dpr:1});
+    const {page,errors}=pageCtx; await harness.goto(page); await page.waitForSelector('#pixi-host canvas');
     // Same-DPR change on one live page.
     let metrics = await harness.setDeviceMetrics(page, { width: 400,height:620,dpr:1 }); await page.waitForTimeout(150); await metrics.detach();
     metrics = await harness.setDeviceMetrics(page, { width: 360,height:558,dpr:1 }); await page.waitForTimeout(200); await metrics.detach();
-    const resized = await inspect(); cases.push({ label:'same-dpr-live-resize', ...resized });
+    const resized = await inspect(page); cases.push({ label:'same-dpr-live-resize', ...resized });
     await page.locator('[data-glass="0"]').click();
     const selected = await page.evaluate(() => window.__STILLLIGHT_PIXI__.state().selected);
     if (selected !== 0) throw new Error(`hit alignment/select failed: selected=${selected}`);
-    const before = await inspect();
+    metrics = await harness.setDeviceMetrics(page, { width: 320,height:496,dpr:1 }); await page.waitForTimeout(200); await metrics.detach();
+    const before = await inspect(page);
     metrics = await harness.setDeviceMetrics(page, { width: 320,height:496,dpr:2 }); await page.waitForTimeout(300);
-    const after = await inspect(); await page.screenshot({ path: `${dir}/dpr-live-change-fail.png` }); artifacts.push(`${dir}/dpr-live-change-fail.png`);
+    const after = await inspect(page); await page.screenshot({ path: `${dir}/dpr-live-change-fail.png` }); artifacts.push(`${dir}/dpr-live-change-fail.png`);
     await metrics.detach();
     if (errors.length) throw Object.assign(new Error(errors.join('; ')), { artifacts });
     // A live DPR change must rebuild the backing store for the new effective density.
