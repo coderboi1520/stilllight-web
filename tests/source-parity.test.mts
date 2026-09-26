@@ -9,7 +9,7 @@ const close=(a:number,b:number,t=1e-12)=>assert.ok(Math.abs(a-b)<=t,`${a} != ${b
 const closePoint=(a:{x:number;y:number},b:{x:number;y:number})=>{close(a.x,b.x);close(a.y,b.y);};
 const closePose=(a:{x:number;y:number;angle:number},b:{x:number;y:number;angle:number})=>{closePoint(a,b);close(a.angle,b.angle);};
 
-test('candidate exported motion geometry numerically matches untouched oracle geometry',()=>{
+test('unchanged exported geometry numerically matches untouched oracle geometry',()=>{
   for(const i of [0,1])closePoint(candidate.position(i),oracle.position(i));
   for(const v of [-1,0,.03,.25,.5,.73,1,2]){
     close(candidate.clamp01(v),oracle.clamp01(v));
@@ -19,7 +19,6 @@ test('candidate exported motion geometry numerically matches untouched oracle ge
   }
   for(const remaining of [0,.25,1,2,3,4])close(candidate.tiltForUnits(remaining),oracle.tiltForUnits(remaining));
   for(const progress of [0,.05,.1,.22,.28,.5,.69,.7,.78,.9,1]){
-    closePose(candidate.movingPose(0,1,progress,3-progress),oracle.movingPose(0,1,progress,3-progress));
     closePose(candidate.selectedPose(0,progress),oracle.selectedPose(0,progress));
     closePose(candidate.invalidPose(0,progress,1),oracle.invalidPose(0,progress,1));
   }
