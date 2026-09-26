@@ -15,14 +15,14 @@ Consolidated verification at `1101bd22847e2932528ae1249e5007035f778c1c` proved:
 - `npm run verify:viewport` — FAIL only because a same-size live DPR change was not observed by `ViewportController`
 - `npm run verify:idle-raf` — FAIL only because the initial sample included one Pixi startup RAF request that was scheduled during `Application.init` and then canceled by the existing scheduler teardown; post-animation settled idle was already 0
 
-Sol diagnosed both remaining failures and implemented the combined fix in:
+Sol diagnosed both remaining failures, self-reviewed them together, and adopted the combined fix in:
 
-- `55f8ec2159bc92c060923a626208804adcc52efa`
+- `6c0a67df8a9037074084e018162d74150cde0eda`
 
 Current implementation details being verified:
 
 1. **Live DPR** — `ViewportController` now maintains a re-armed resolution media-query watcher for DPR-only transitions. It still uses the existing `sync()` path, so density changes flow through the same renderer resize/rebuild logic without polling or a permanent RAF.
-2. **Idle RAF acceptance** — production scheduler teardown remains unchanged. The idle harness now waits for `window.__STILLLIGHT_PIXI__`, resets the pre-load RAF probe, and then measures settled idle. This excludes canceled initialization requests while still detecting any recurring ticker/RAF that survives startup.
+2. **Idle RAF acceptance** — production scheduler teardown remains unchanged. Pixi's system ticker requests one RAF while `SchedulerSystem.init()` runs, and ticker listener removal cancels that pending request when no listeners remain. The idle harness now waits for `window.__STILLLIGHT_PIXI__`, resets the pre-load RAF probe, and then measures settled idle. This excludes canceled initialization requests while still detecting any recurring ticker/RAF that survives startup.
 3. **Context restoration** — no production change was made to the now-passing retained-context path.
 
 Do **not** edit production source, tests, harness code, dependencies, configuration, or documentation. Return evidence only.
