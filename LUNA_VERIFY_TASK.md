@@ -1,4 +1,4 @@
-# STILLLIGHT — Consolidated Luna A+B+C Verification Task
+# STILLLIGHT — Narrow Luna Final Verification Task
 
 **STATUS: ACTIVE**  
 **ROLE: LOCAL RUNTIME VERIFIER ONLY**
@@ -6,99 +6,63 @@
 Repository: `coderboi1520/stilllight-web`  
 Branch: `stage2-m1-runtime`
 
-## Sol ownership checkpoint
+## Sol-owned checkpoint
 
-Sol reviewed the complete unexpected Luna-authored diff from the last Sol-owned checkpoint `9fac04968eaed1fd4c9eed844c38239044c3bc58` through `0657ae03ba4c919fbe978c50079295173732c4c9` before authorizing runtime verification.
+Consolidated verification at `1101bd22847e2932528ae1249e5007035f778c1c` proved:
 
-The Luna production commit `7d15a4ba119ba9fde98901c1b5cb04e58195aae4` is **not** accepted as authoritative by itself. Sol source-reviewed its texture/resource-ownership changes against `SOL_TASK.md`, Astra's retained-renderer architecture, and PixiJS 8.18 lifecycle source, then reworked the implementation where necessary.
+- `npm run verify:fast` — PASS
+- `npm run verify:context` — PASS
+- `npm run verify:viewport` — FAIL only because a same-size live DPR change was not observed by `ViewportController`
+- `npm run verify:idle-raf` — FAIL only because the initial sample included one Pixi startup RAF request that was scheduled during `Application.init` and then canceled by the existing scheduler teardown; post-animation settled idle was already 0
 
-Authoritative Sol-owned production checkpoint for B/C:
+Sol diagnosed both remaining failures and implemented the combined fix in:
 
-- `8fd607418024524ae23af9bf4f2a85aa33d55469` — Sol-reviewed/adopted Pixi lifecycle and explicit resource teardown
+- `55f8ec2159bc92c060923a626208804adcc52efa`
 
-Earlier production fix lineage retained in history:
+Current implementation details being verified:
 
-- `344d8efd99f3c03eded366ad75aec1be3b257209` — initial build/type correctness
-- `92c674e621426b7607c1c6bec5eff55503210ff2` — restore literal Pixi event-detach invariant
-- `e22b11259d0bd2dcae7f70bda323839ed9976457` — initial live-DPR retained-generation handoff
-- `e12d3df956e33baf2ab55e84048f89b91827eb14` — remove recurring Pixi renderer scheduler RAF
+1. **Live DPR** — `ViewportController` now maintains a re-armed resolution media-query watcher for DPR-only transitions. It still uses the existing `sync()` path, so density changes flow through the same renderer resize/rebuild logic without polling or a permanent RAF.
+2. **Idle RAF acceptance** — production scheduler teardown remains unchanged. The idle harness now waits for `window.__STILLLIGHT_PIXI__`, resets the pre-load RAF probe, and then measures settled idle. This excludes canceled initialization requests while still detecting any recurring ticker/RAF that survives startup.
+3. **Context restoration** — no production change was made to the now-passing retained-context path.
 
-`SOL_CONTINUATION_POLICY.md` requires this to be one consolidated evidence pass after Work Packages A, B and C. Luna is an evidence instrument only.
-
-## Scope
-
-Do **not** edit production source, tests, harness code, dependencies, configuration, or documentation. Do **not** redesign or broadly debug. Return raw evidence for Sol to interpret.
-
-The current Sol-owned source diagnoses/fixes being verified are:
-
-1. **Build/type correctness** — the authored reusable `Float64Array` storage contract compiles, and the intentional Pixi `setTargetElement(null)` runtime call remains literal with a narrow TypeScript suppression.
-2. **Live DPR lifecycle** — a density change still creates a new retained Pixi view generation because DPR-sensitive glow/stream raster assets must be rebaked. The removed generation is retained until the first successful replacement render, then its private generated textures plus its `MeshSimple` geometries/buffers are explicitly destroyed. Shared `Texture.WHITE` and the reusable circle texture are not destroyed.
-3. **WebGL context restoration** — context restore no longer rebuilds the STILLLIGHT view graph. PixiJS 8.18's own `contextChange` systems invalidate context-bound geometry/buffer GPU data and recreate it lazily from the retained CPU resources on the next render. STILLLIGHT's restore listener only invalidates through `onRestore()`.
-4. **Idle RAF** — PixiJS 8.18's renderer `SchedulerSystem` registers on `Ticker.system` for periodic renderer GC even with the application ticker stopped. This fixed retained scene disables renderer GC scheduling and destroys that scheduler listener, leaving `FrameGate` as the production animation gate.
-
-## Sol source review and deferred evidence
-
-Sol reviewed the complete current B/C ownership path and exact diff. The review specifically checked:
-
-- renderer/context generation boundaries
-- fresh-load vs live-DPR transition behavior
-- retained `MeshSimple` geometry/buffer lifetime
-- private vs shared texture ownership
-- context-loss/restoration semantics in PixiJS 8.18
-- explicit teardown now that renderer GC scheduling is disabled
-- Canvas fallback isolation
-- authored model/timing isolation
-- structural tests for context retention, DPR retirement, explicit resource teardown, and background RAF owners
-
-No runtime PASS is claimed by this document. All executable evidence below remains pending for this consolidated Luna pass.
-
-| Pending evidence | Why needed | Blocking before handoff? |
-|---|---|---|
-| `npm run verify:fast` | Build, unit, structural, and reference gates for all current Sol-owned A/B/C source | No |
-| `npm run verify:viewport` | Observe live DPR and same-page resize behavior after retained-generation retirement | No |
-| `npm run verify:context` | Confirm retained view/resources recover through real WebGL context restoration | No |
-| `npm run verify:idle-raf` | Measure settled idle and active animation RAF requests after scheduler removal | No |
-| `npm run verify:m1` | Final broad acceptance after all targeted prerequisites pass | Run once only if the first four checks pass |
+Do **not** edit production source, tests, harness code, dependencies, configuration, or documentation. Return evidence only.
 
 ## Required steps
 
 1. Fast-forward the local checkout to current `origin/stage2-m1-runtime` only.
 2. Record the exact tested commit SHA.
-3. Run the following commands in this order, capturing exact stdout/stderr and exit codes:
+3. Run this directly necessary regression check first:
 
 ```bash
-npm run verify:fast
+npx tsc -p tsconfig.json --noEmit
+node --test tests/renderer-structure.test.mjs
+```
+
+4. Run the two targeted runtime checks:
+
+```bash
 npm run verify:viewport
-npm run verify:context
 npm run verify:idle-raf
 ```
 
-4. Do not stop merely because an earlier command fails. Continue through later independent targeted scenarios when the application/dev server can still run safely. Skip only a scenario whose prerequisite is genuinely invalidated, and state exactly why it was skipped.
-5. If `verify:fast`, `verify:viewport`, `verify:context`, and `verify:idle-raf` all PASS, run the final broad acceptance exactly once:
+5. If the TypeScript/structural regression check, `verify:viewport`, and `verify:idle-raf` all PASS, run the final broad acceptance exactly once:
 
 ```bash
 npm run verify:m1
 ```
 
-6. Stop after collecting this evidence. Make no source edits and no commits.
+6. Stop after collecting the requested evidence. Make no source edits and no commits.
 
 ## Evidence to return
 
-Return one consolidated report containing:
+Return one report containing:
 
 - exact tested Git SHA
 - command and exit code for every requested command
-- exact PASS / FAIL / SKIPPED status per command/scenario
-- full relevant build/test failure text if any
-- all browser `pageerror` / error-console messages from the targeted runtime scenarios
-- live-DPR before/after CSS/backing/DPR metrics and artifact paths
-- context-loss/restoration observations, context usability result, state/frame preservation result, page errors, and artifact paths
-- idle-RAF measurements for settled load, active animation, and settled post-animation, including captured stack attribution if nonzero
-- final `verify:m1` output and exit code if its prerequisites were green
-- environment/setup error verbatim if any requested scenario cannot execute
+- structural test count/result
+- `verify:viewport` PASS/FAIL with live-DPR before/after board, CSS, backing-store, and DPR metrics plus page errors/artifacts
+- `verify:idle-raf` PASS/FAIL with settled-after-load, active-animation, and settled-after-animation RAF counts plus any captured stacks/page errors
+- final `verify:m1` exact output and exit code if prerequisites are green
+- environment/setup errors verbatim if any command cannot execute
 
-Do not summarize a failure as merely "failed" when the harness produced a concrete error or metric; include the concrete evidence.
-
-## Stop condition
-
-Stop only after the requested evidence collection is complete. Do not diagnose beyond the returned evidence and do not modify the repository.
+Do not modify anything and do not diagnose beyond the returned evidence.
