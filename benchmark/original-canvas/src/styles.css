@@ -56,19 +56,18 @@ canvas { display: block; }
   top: 10px;
   left: 10px;
   z-index: 3;
-  min-width: 176px;
+  min-width: 188px;
   padding: 7px 9px;
   border: 0;
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.46);
-  pointer-events: none;
   font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   text-shadow: 0 1px 2px #000;
 }
 
 .live-overlay dl {
   display: grid;
-  grid-template-columns: auto minmax(54px, 1fr);
+  grid-template-columns: auto minmax(72px, 1fr);
   gap: 1px 10px;
   margin: 0;
 }
@@ -81,6 +80,18 @@ canvas { display: block; }
   color: #f2fbff;
 }
 
+.live-overlay select {
+  width: 76px;
+  margin: 0;
+  padding: 0 2px;
+  border: 1px solid #38505b;
+  border-radius: 3px;
+  background: #0b1b23;
+  color: #f2fbff;
+  font: inherit;
+  text-align: right;
+}
+
 .summary { display: none !important; }
 
 @media (max-width: 680px) {
@@ -88,8 +99,9 @@ canvas { display: block; }
   .live-overlay {
     top: 6px;
     left: 6px;
-    min-width: 150px;
+    min-width: 166px;
     padding: 6px 7px;
     font-size: 10px;
   }
+  .live-overlay select { width: 68px; }
 }
