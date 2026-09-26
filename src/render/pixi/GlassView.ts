@@ -2,7 +2,7 @@ import { Container,Graphics,GraphicsContext,Sprite } from 'pixi.js';
 import type {Texture} from 'pixi.js';
 import type {GlassFrame} from '../../core/RenderFrame.ts';
 import {LiquidView} from './LiquidView.ts';
-import {makeBodyShadowTexture,makeGlowTexture,makeShineTexture} from './assets.ts';
+import {makeBodyShadowTexture,makeGlassBaseTexture,makeGlassEdgeTexture,makeGlassRimTexture,makeGlowTexture,makeShineTexture} from './assets.ts';
 
 function closedGlassContext(){
   return new GraphicsContext()
@@ -40,25 +40,35 @@ export class GlassView{
   private clip=new Graphics(closedGlassContext()).fill(0xffffff);
   private clipped=new Container();
   private liquid=new LiquidView();
-  private shineTexture=makeShineTexture();
-  private shine=new Sprite(this.shineTexture);
-  private normal=outline('#c8e1ed9b',1.6,'#e6f3f8c7',1.4);
+  private baseTexture=makeGlassBaseTexture();
+  private baseDepth=new Sprite(this.baseTexture);
+  private reflectionTexture=makeShineTexture();
+  private reflection=new Sprite(this.reflectionTexture);
+  private edgeTexture=makeGlassEdgeTexture();
+  private edgeHighlight=new Sprite(this.edgeTexture);
+  private rimTexture=makeGlassRimTexture();
+  private normalRim=new Sprite(this.rimTexture);
+  private normal=new Graphics(openWallContext()).stroke({color:'#b9d8e66f',width:1.25});
   private selected=outline('#f5d38e',1.6,'#f9e1ae',1.8);
   private invalid=outline('#ff8e94',3,'#ffb0b5',1.4);
-  private highlight=new Graphics().moveTo(-25,14).lineTo(-25,123).stroke({color:'#ffffff52',width:2});
   private glows:{selected:Sprite;hintSource:Sprite;hintTarget:Sprite;invalid:Sprite};
   private glowList:Sprite[]=[];
-  private ownedTextures:Texture[]=[this.shadowTexture,this.shineTexture];
+  private ownedTextures:Texture[]=[this.shadowTexture,this.baseTexture,this.reflectionTexture,this.edgeTexture,this.rimTexture];
   private destroyed=false;
 
   constructor(){
     this.shadow.position.set(-90,-36);
     this.shadow.width=180;
     this.shadow.height=230;
-    this.body.fill({color:'#0c1f2a',alpha:.78});
-    this.shine.position.set(-34,0);
-    this.shine.width=68;
-    this.shine.height=158;
+    this.body.fill({color:'#102731',alpha:.18});
+    for(const surface of [this.baseDepth,this.reflection,this.edgeHighlight]){
+      surface.position.set(-34,0);
+      surface.width=68;
+      surface.height=158;
+    }
+    this.normalRim.position.set(-90,-36);
+    this.normalRim.width=180;
+    this.normalRim.height=230;
     const selectedTexture=makeGlowTexture('#f5d38e',2.4,16),hintSourceTexture=makeGlowTexture('#f5d38e',2.4,16),hintTargetTexture=makeGlowTexture('#83e0d4',2.4,16),invalidTexture=makeGlowTexture('#ff8e94',3,12);
     this.ownedTextures.push(selectedTexture,hintSourceTexture,hintTargetTexture,invalidTexture);
     this.glows={selected:new Sprite(selectedTexture),hintSource:new Sprite(hintSourceTexture),hintTarget:new Sprite(hintTargetTexture),invalid:new Sprite(invalidTexture)};
@@ -69,9 +79,9 @@ export class GlassView{
       g.height=230;
       g.visible=false;
     }
-    this.clipped.addChild(this.liquid.root,this.shine);
+    this.clipped.addChild(this.liquid.root,this.baseDepth,this.reflection,this.edgeHighlight);
     this.clipped.mask=this.clip;
-    this.root.addChild(this.shadow,this.body,this.clip,this.clipped,...this.glowList,this.normal,this.selected,this.invalid,this.highlight);
+    this.root.addChild(this.shadow,this.body,this.clip,this.clipped,...this.glowList,this.normal,this.normalRim,this.selected,this.invalid);
     this.selected.visible=this.invalid.visible=false;
   }
 
@@ -87,9 +97,12 @@ export class GlassView{
   update(frame:GlassFrame){
     this.root.position.set(frame.pose.x,frame.pose.y);
     this.root.rotation=frame.pose.angle;
+    this.reflection.x=-34+Math.max(-2,Math.min(2,-Math.sin(frame.pose.angle)*2));
     this.liquid.update(frame);
     for(const g of this.glowList)g.visible=false;
-    this.normal.visible=!frame.invalid&&!frame.selected;
+    const normalVisible=!frame.invalid&&!frame.selected;
+    this.normal.visible=normalVisible;
+    this.normalRim.visible=normalVisible;
     this.selected.visible=frame.selected&&!frame.invalid;
     this.invalid.visible=frame.invalid;
     if(frame.invalid)this.glows.invalid.visible=true;
