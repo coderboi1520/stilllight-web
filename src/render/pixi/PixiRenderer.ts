@@ -11,7 +11,7 @@ export class PixiRenderer{
   private scene=new Container();
   private glasses:[GlassView,GlassView]|null=null;
   private stream:StreamView|null=null;
-  private retiredRoots:Container[]=[];
+  private retiredViews:(GlassView|StreamView)[]=[];
   private initialized=false;
   private movingIndex=-2;
   private density=1;
@@ -43,13 +43,13 @@ export class PixiRenderer{
     if(this.glasses&&this.stream&&!force)return;
     if(this.glasses){
       this.scene.removeChildren();
-      this.retiredRoots.push(this.glasses[0].root,this.glasses[1].root);
-      if(this.stream)this.retiredRoots.push(this.stream.root);
+      this.retiredViews.push(this.glasses[0],this.glasses[1]);
+      if(this.stream)this.retiredViews.push(this.stream);
     }
     this.glasses=[new GlassView(),new GlassView()];this.stream=new StreamView();this.scene.addChild(this.glasses[0].root,this.glasses[1].root,this.stream.root);this.movingIndex=-2;
   }
 
-  private destroyRetiredViews(){for(const root of this.retiredRoots)root.destroy({children:true});this.retiredRoots.length=0;}
+  private destroyRetiredViews(){for(const view of this.retiredViews)view.destroy();this.retiredViews.length=0;}
 
   resize(width:number,height:number,density:number){
     const next=Math.max(1,Math.min(density||1,2));
@@ -71,5 +71,5 @@ export class PixiRenderer{
     const movingIndex=frame.glasses[0].moving?0:frame.glasses[1].moving?1:-1;this.ensureDrawOrder(movingIndex);this.stream.update(frame.stream);this.app.renderer.render(this.app.stage);this.destroyRetiredViews();
   }
 
-  destroy(){this.app.canvas?.removeEventListener('webglcontextrestored',this.restoreHandler);this.destroyRetiredViews();try{this.app.destroy(true,{children:true});}catch{}this.initialized=false;}
+  destroy(){this.app.canvas?.removeEventListener('webglcontextrestored',this.restoreHandler);this.glasses?.forEach(view=>view.destroy());this.stream?.destroy();this.glasses=null;this.stream=null;this.destroyRetiredViews();try{this.app.destroy(true,{children:true});}catch{}this.initialized=false;}
 }

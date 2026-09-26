@@ -1,7 +1,7 @@
 import { Container,MeshSimple,Sprite,Texture } from 'pixi.js';
 import { COLORS } from '../../core/constants.ts';
 import type {StreamFrame} from '../../core/RenderFrame.ts';
-import {getCircleTexture,makeStreamHaloCapTexture,makeStreamHaloTexture} from './assets.ts';
+import {acquireStreamTextures,getCircleTexture} from './assets.ts';
 
 const CURVE_SEGMENTS=32;
 const CURVE_SAMPLES=CURVE_SEGMENTS+1;
@@ -98,14 +98,23 @@ export class StreamView{
   root=new Container();
   private center=new Float64Array(CURVE_SAMPLES*2);
   private normals=new Float64Array(CURVE_SAMPLES*2);
-  private halo=new CurveStroke(STREAM_HALO_SPAN,makeStreamHaloTexture(),makeStreamHaloCapTexture(),STREAM_HALO_SPAN);
+  private streamTextures=acquireStreamTextures();
+  private halo=new CurveStroke(STREAM_HALO_SPAN,this.streamTextures.halo,this.streamTextures.cap,STREAM_HALO_SPAN);
   private colorStroke=new CurveStroke(5.8);
   private core=new CurveStroke(1.8);
   private impact=new ImpactRing();
+  private destroyed=false;
 
   constructor(){
     this.root.addChild(this.halo.root,this.colorStroke.root,this.core.root,this.impact.root);
     this.root.visible=false;
+  }
+
+  destroy(){
+    if(this.destroyed)return;
+    this.destroyed=true;
+    this.root.destroy({children:true});
+    this.streamTextures.release();
   }
 
   update(stream:StreamFrame|null){

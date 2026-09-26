@@ -27,12 +27,24 @@ function drawRim(ctx:CanvasRenderingContext2D){
 }
 
 let assetDensity=Math.min(typeof devicePixelRatio==='number'&&devicePixelRatio>0?devicePixelRatio:1,2);
+type StreamTextureGeneration={density:number;halo:Texture;cap:Texture;references:number};
+const streamTextureGenerations:StreamTextureGeneration[]=[];
+
+function disposeUnusedStreamTextureGenerations(){
+  for(let i=streamTextureGenerations.length-1;i>=0;i--){
+    const generation=streamTextureGenerations[i];
+    if(generation.references!==0||Math.abs(generation.density-assetDensity)<1e-6)continue;
+    streamTextureGenerations.splice(i,1);
+    generation.halo.destroy(true);
+    generation.cap.destroy(true);
+  }
+}
+
 export function configureAssetDensity(density:number){
   const next=Math.max(1,Math.min(density||1,2));
   if(Math.abs(next-assetDensity)<1e-6)return false;
   assetDensity=next;
-  streamHaloTexture=null;
-  streamHaloCapTexture=null;
+  disposeUnusedStreamTextureGenerations();
   return true;
 }
 function cappedDensity(){return assetDensity;}
@@ -104,8 +116,6 @@ export function makeGlowTexture(color:string,width:number,blur:number){
 const STREAM_HALO_SPAN=40;
 const STREAM_WIDTH=5.8;
 const STREAM_BLUR=10;
-let streamHaloTexture:Texture|null=null;
-let streamHaloCapTexture:Texture|null=null;
 
 function drawStreamShadowOnly(ctx:CanvasRenderingContext2D,drawCore:()=>void){
   ctx.strokeStyle='#fff';
@@ -119,7 +129,6 @@ function drawStreamShadowOnly(ctx:CanvasRenderingContext2D,drawCore:()=>void){
 }
 
 export function makeStreamHaloTexture(){
-  if(streamHaloTexture)return streamHaloTexture;
   const density=cappedDensity();
   const work=document.createElement('canvas');
   const workSize=Math.max(1,Math.round(STREAM_HALO_SPAN*density));
@@ -143,12 +152,10 @@ export function makeStreamHaloTexture(){
   canvas.height=workSize;
   const ctx=canvas.getContext('2d')!;
   ctx.drawImage(work,Math.floor((workSize-slice)*.5),0,slice,workSize,0,0,canvas.width,canvas.height);
-  streamHaloTexture=rawCanvasTexture(canvas);
-  return streamHaloTexture;
+  return rawCanvasTexture(canvas);
 }
 
 export function makeStreamHaloCapTexture(){
-  if(streamHaloCapTexture)return streamHaloCapTexture;
   const density=cappedDensity();
   const canvas=document.createElement('canvas');
   const size=Math.max(1,Math.round(STREAM_HALO_SPAN*density));
@@ -160,8 +167,28 @@ export function makeStreamHaloCapTexture(){
     ctx.arc(STREAM_HALO_SPAN*.5,STREAM_HALO_SPAN*.5,STREAM_WIDTH*.5,0,Math.PI*2);
     ctx.fill();
   });
-  streamHaloCapTexture=rawCanvasTexture(canvas);
-  return streamHaloCapTexture;
+  return rawCanvasTexture(canvas);
+}
+
+export function acquireStreamTextures(){
+  let generation=streamTextureGenerations.find(item=>Math.abs(item.density-assetDensity)<1e-6);
+  if(!generation){
+    generation={density:assetDensity,halo:makeStreamHaloTexture(),cap:makeStreamHaloCapTexture(),references:0};
+    streamTextureGenerations.push(generation);
+  }
+  const current=generation;
+  current.references++;
+  let released=false;
+  return{
+    halo:current.halo,
+    cap:current.cap,
+    release(){
+      if(released)return;
+      released=true;
+      current.references--;
+      disposeUnusedStreamTextureGenerations();
+    },
+  };
 }
 
 export function makeShineTexture(){
