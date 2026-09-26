@@ -54,6 +54,16 @@ function rawCanvasTexture(canvas:HTMLCanvasElement){
   return texture;
 }
 
+function glassSurfaceTexture(draw:(ctx:CanvasRenderingContext2D)=>void){
+  const canvas=document.createElement('canvas');
+  canvas.width=136;
+  canvas.height=316;
+  const ctx=canvas.getContext('2d')!;
+  ctx.scale(2,2);
+  draw(ctx);
+  return rawCanvasTexture(canvas);
+}
+
 let circleTexture:Texture|null=null;
 export function getCircleTexture(){
   if(circleTexture)return circleTexture;
@@ -96,6 +106,65 @@ export function makeGlowTexture(color:string,width:number,blur:number){
     drawRim(ctx);
     ctx.stroke();
   },cappedDensity());
+}
+
+export function makeGlassRimTexture(){
+  return canvasTexture(ctx=>{
+    ctx.lineCap='round';
+    drawRim(ctx);
+    ctx.strokeStyle='rgba(169,202,219,.34)';
+    ctx.lineWidth=1.05;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(0,0,33,4.5,0,0,Math.PI);
+    ctx.strokeStyle='rgba(234,247,250,.62)';
+    ctx.lineWidth=1.25;
+    ctx.stroke();
+  });
+}
+
+export function makeGlassBaseTexture(){
+  return glassSurfaceTexture(ctx=>{
+    const shade=ctx.createLinearGradient(0,118,0,158);
+    shade.addColorStop(0,'rgba(4,16,22,0)');
+    shade.addColorStop(.58,'rgba(4,16,22,.022)');
+    shade.addColorStop(1,'rgba(4,16,22,.095)');
+    ctx.fillStyle=shade;
+    ctx.fillRect(0,118,68,40);
+
+    ctx.save();
+    ctx.translate(34,153);
+    ctx.scale(1,.28);
+    const lift=ctx.createRadialGradient(0,0,4,0,0,32);
+    lift.addColorStop(0,'rgba(225,245,249,.04)');
+    lift.addColorStop(.55,'rgba(225,245,249,.016)');
+    lift.addColorStop(1,'rgba(225,245,249,0)');
+    ctx.fillStyle=lift;
+    ctx.fillRect(-34,-34,68,68);
+    ctx.restore();
+  });
+}
+
+export function makeGlassEdgeTexture(){
+  return glassSurfaceTexture(ctx=>{
+    const fade=ctx.createLinearGradient(0,23,0,111);
+    fade.addColorStop(0,'rgba(242,251,255,0)');
+    fade.addColorStop(.2,'rgba(242,251,255,.10)');
+    fade.addColorStop(.5,'rgba(242,251,255,.22)');
+    fade.addColorStop(.8,'rgba(242,251,255,.09)');
+    fade.addColorStop(1,'rgba(242,251,255,0)');
+    ctx.save();
+    ctx.lineCap='round';
+    ctx.strokeStyle=fade;
+    ctx.lineWidth=1.25;
+    ctx.shadowColor='rgba(232,248,253,.14)';
+    ctx.shadowBlur=2.4;
+    ctx.beginPath();
+    ctx.moveTo(61,24);
+    ctx.bezierCurveTo(62.7,46,63.2,76,61.4,110);
+    ctx.stroke();
+    ctx.restore();
+  });
 }
 
 const STREAM_HALO_SPAN=40;
@@ -156,21 +225,17 @@ export function makeStreamHaloCapTexture(){
 }
 
 export function makeShineTexture(){
-  const canvas=document.createElement('canvas');
-  canvas.width=136;
-  canvas.height=316;
-  const ctx=canvas.getContext('2d')!;
-  ctx.scale(2,2);
-  ctx.save();
-  ctx.translate(15,79);
-  ctx.scale(.26,1);
-  const g=ctx.createRadialGradient(0,0,0,0,0,70);
-  g.addColorStop(0,'rgba(236,249,255,.14)');
-  g.addColorStop(.34,'rgba(236,249,255,.09)');
-  g.addColorStop(.72,'rgba(236,249,255,.025)');
-  g.addColorStop(1,'rgba(236,249,255,0)');
-  ctx.fillStyle=g;
-  ctx.fillRect(-70,-70,140,140);
-  ctx.restore();
-  return rawCanvasTexture(canvas);
+  return glassSurfaceTexture(ctx=>{
+    ctx.save();
+    ctx.translate(15,79);
+    ctx.scale(.26,1);
+    const g=ctx.createRadialGradient(0,0,0,0,0,70);
+    g.addColorStop(0,'rgba(236,249,255,.14)');
+    g.addColorStop(.34,'rgba(236,249,255,.09)');
+    g.addColorStop(.72,'rgba(236,249,255,.025)');
+    g.addColorStop(1,'rgba(236,249,255,0)');
+    ctx.fillStyle=g;
+    ctx.fillRect(-70,-70,140,140);
+    ctx.restore();
+  });
 }
