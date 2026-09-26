@@ -12,6 +12,7 @@ Production fix commits to verify:
 - `92c674e621426b7607c1c6bec5eff55503210ff2` — restore literal Pixi event-detach invariant
 - `e22b11259d0bd2dcae7f70bda323839ed9976457` — live DPR/context retained-resource lifecycle handoff
 - `e12d3df956e33baf2ab55e84048f89b91827eb14` — remove recurring Pixi renderer scheduler RAF
+- `7d15a4ba119ba9fde98901c1b5cb04e58195aae4` — explicitly release retired view textures while preserving density-shared stream assets
 
 `SOL_CONTINUATION_POLICY.md` requires this to be one consolidated evidence pass after Work Packages A, B and C. Luna is an evidence instrument only.
 
@@ -22,8 +23,22 @@ Do **not** edit production source, tests, harness code, dependencies, configurat
 The source-level diagnoses being verified are:
 
 1. Build/type correctness: the authored reusable `Float64Array` storage contract compiles, and the intentional Pixi `setTargetElement(null)` runtime call remains literal with a narrow TypeScript suppression.
-2. Live DPR/context lifecycle: density/context rebuilds previously destroyed old retained Pixi view roots before Pixi's retained render instructions had crossed to the replacement scene generation. Old roots are now retired through the first successful render and destroyed afterward.
+2. Live DPR/context lifecycle: density/context rebuilds previously destroyed old retained Pixi view roots before Pixi's retained render instructions had crossed to the replacement scene generation. Old views are now retired through the first replacement render and destroyed afterward. Each glass view destroys its private generated texture sources; stream halo/cap textures use density-keyed leases so old sources are released only after their last view is retired. Shared `Texture.WHITE` and the reusable circle texture remain shared.
 3. Idle RAF: Pixi 8.18's renderer `SchedulerSystem` registers on `Ticker.system` for periodic renderer GC even when the application ticker and EventTicker are stopped. This fixed retained scene now disables renderer GC scheduling and destroys that scheduler listener, leaving `FrameGate` as the production animation gate.
+
+## Sol source review and deferred evidence
+
+Sol reviewed the complete B/C ownership path and the exact source diffs. The focused structural regression test failed against the prior view-root teardown, then passed after explicit texture ownership was added: `node --test tests/renderer-structure.test.mjs` — 7/7 PASS. `git diff --check` reported no whitespace errors; PowerShell/Git emitted only the expected LF-to-CRLF normalization warnings.
+
+The following evidence remains queued for this single Luna pass:
+
+| Pending evidence | Why needed | Blocking before handoff? |
+|---|---|---|
+| `npm run verify:fast` | Build, unit, and reference gates for all A/B/C source changes, including the structural ownership guard | No |
+| `npm run verify:viewport` | Observe live DPR and same-page resize behavior after view-generation retirement | No |
+| `npm run verify:context` | Observe WebGL context restoration and frame/state recovery | No |
+| `npm run verify:idle-raf` | Measure settled idle and active animation RAF requests after scheduler removal | No |
+| `npm run verify:m1` | Final broad acceptance after all targeted prerequisites pass | Run once only if the first four checks pass |
 
 ## Required steps
 
