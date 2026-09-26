@@ -16,14 +16,23 @@
       <dt>Scheduler</dt><dd>Uncapped</dd>
       <dt>Cycle</dt><dd data-live="cycle">1</dd>
       <dt>Elapsed</dt><dd data-live="elapsed">0.00 s</dd>
-      <dt>Current FPS</dt><dd data-live="fps">—</dd>
-      <dt>Min FPS</dt><dd data-live="min-fps">—</dd>
-      <dt>Avg FPS</dt><dd data-live="avg-fps">—</dd>
-      <dt>Max FPS</dt><dd data-live="max-fps">—</dd>
-      <dt>Frame ms</dt><dd data-live="frame-ms">—</dd>
+      <dt>Phase</dt><dd data-measure="phase">Warmup</dd>
+      <dt>CPU Throughput</dt><dd data-live="fps">—</dd>
+      <dt>Min FPS</dt><dd data-measure="min-fps">—</dd>
+      <dt>Avg FPS</dt><dd data-measure="avg-fps">—</dd>
+      <dt>Max FPS</dt><dd data-measure="max-fps">—</dd>
+      <dt>1% Low</dt><dd data-measure="one-low">—</dd>
+      <dt>P95 frame</dt><dd data-measure="p95-ms">—</dd>
+      <dt>P99 frame</dt><dd data-measure="p99-ms">—</dd>
+      <dt>Current frame</dt><dd data-live="frame-ms">—</dd>
       <dt>Active glasses</dt><dd data-live="active-glasses">0</dd>
       <dt>Active pours</dt><dd data-live="active-pours">0</dd>
     </dl>
+    <div hidden aria-hidden="true">
+      <span data-live="min-fps"></span>
+      <span data-live="avg-fps"></span>
+      <span data-live="max-fps"></span>
+    </div>
   </aside>
 
   <main class="benchmark-shell">
@@ -33,5 +42,6 @@
   </main>
 
   <script type="module" src="./main.js"></script>
+  <script type="module" src="../shared/measurement-overlay.js"></script>
 </body>
 </html>
