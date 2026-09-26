@@ -14,9 +14,9 @@ function fpsFromFrameTime(frameMs) {
   return frameMs && frameMs > 0 ? 1000 / frameMs : null;
 }
 
-// The benchmark has one authoritative workload: ten glasses with deliberate
-// two- and three-pour overlap plus hint/invalid feedback. Keep this script
-// deterministic so the retained Pixi architecture can replay it later.
+// One authoritative workload: ten glasses with deliberate two- and three-pour
+// overlap plus hint/invalid feedback. Keep this deterministic so the retained
+// Pixi benchmark can replay the exact same work later.
 export const BENCHMARK_SCRIPTS = Object.freeze({
   '10-glass': Object.freeze({
     durationMs: 15000,
@@ -128,7 +128,10 @@ export class BenchmarkStats {
   beginFrame(now) {
     if (!this.running) return;
     this.rafCallbacks += 1;
-    if (this.previousFrameAt !== null) this.frameTimes.push(now - this.previousFrameAt);
+    if (this.previousFrameAt !== null) {
+      const delta = now - this.previousFrameAt;
+      if (delta > 0) this.frameTimes.push(delta);
+    }
     this.previousFrameAt = now;
   }
 
@@ -178,7 +181,7 @@ export class BenchmarkStats {
   updateOverlay(now, activity) {
     if (!this.running || now - this.lastOverlayAt < 150) return;
     this.lastOverlayAt = now;
-    const recent = this.frameTimes.slice(-30);
+    const recent = this.frameTimes.slice(-120);
     const frameMs = recent.length ? recent.at(-1) : null;
     const liveFrame = average(recent);
     this.onOverlay({
@@ -215,6 +218,7 @@ export class BenchmarkStats {
     const durationMs = now - this.startedAt;
     const avgFrame = average(this.frameTimes);
     const worstFrame = this.frameTimes.length ? Math.max(...this.frameTimes) : null;
+    const bestFrame = this.frameTimes.length ? Math.min(...this.frameTimes) : null;
     const slowestCount = this.frameTimes.length >= 100
       ? Math.max(1, Math.ceil(this.frameTimes.length * 0.01))
       : 0;
@@ -222,18 +226,28 @@ export class BenchmarkStats {
       ? [...this.frameTimes].sort((a, b) => b - a).slice(0, slowestCount)
       : [];
     const onePercentLow = slowestFrameTimes.length ? fpsFromFrameTime(average(slowestFrameTimes)) : null;
+    const averageFPS = durationMs > 0 ? this.renderedFrames / (durationMs / 1000) : null;
+    const minimumFPS = fpsFromFrameTime(worstFrame);
+    const maximumFPS = fpsFromFrameTime(bestFrame);
 
     const result = {
       mode: this.mode,
+      scheduler: window.__STILLLIGHT_BENCHMARK_SCHEDULER__?.mode || 'native-requestAnimationFrame',
+      fpsMeaning: 'render-loop-throughput',
       totalDurationMs: round(durationMs),
+      totalFrameCallbacks: this.rafCallbacks,
       totalRAFCallbacks: this.rafCallbacks,
       renderedFrameCount: this.renderedFrames,
-      averageFPS: round(fpsFromFrameTime(avgFrame)),
-      minimumSampleFPS: round(fpsFromFrameTime(worstFrame)),
+      minimumFPS: round(minimumFPS),
+      averageFPS: round(averageFPS),
+      maximumFPS: round(maximumFPS),
+      // Kept as an alias so older result readers continue to work.
+      minimumSampleFPS: round(minimumFPS),
       onePercentLowFPS: onePercentLow === null ? UNAVAILABLE : round(onePercentLow),
       averageFrameTimeMs: round(avgFrame),
       p95FrameTimeMs: round(percentile(this.frameTimes, 0.95)),
       p99FrameTimeMs: round(percentile(this.frameTimes, 0.99)),
+      bestFrameTimeMs: round(bestFrame),
       worstFrameTimeMs: round(worstFrame),
       framesOver16_67Ms: this.frameTimes.filter((value) => value > 16.67).length,
       framesOver8_33Ms: this.frameTimes.filter((value) => value > 8.33).length,
