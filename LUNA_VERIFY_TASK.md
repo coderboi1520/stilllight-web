@@ -6,13 +6,22 @@
 Repository: `coderboi1520/stilllight-web`  
 Branch: `stage2-m1-runtime`
 
-Production fix commits to verify:
+## Sol ownership checkpoint
+
+Sol reviewed the complete unexpected Luna-authored diff from the last Sol-owned checkpoint `9fac04968eaed1fd4c9eed844c38239044c3bc58` through `0657ae03ba4c919fbe978c50079295173732c4c9` before authorizing runtime verification.
+
+The Luna production commit `7d15a4ba119ba9fde98901c1b5cb04e58195aae4` is **not** accepted as authoritative by itself. Sol source-reviewed its texture/resource-ownership changes against `SOL_TASK.md`, Astra's retained-renderer architecture, and PixiJS 8.18 lifecycle source, then reworked the implementation where necessary.
+
+Authoritative Sol-owned production checkpoint for B/C:
+
+- `8fd607418024524ae23af9bf4f2a85aa33d55469` — Sol-reviewed/adopted Pixi lifecycle and explicit resource teardown
+
+Earlier production fix lineage retained in history:
 
 - `344d8efd99f3c03eded366ad75aec1be3b257209` — initial build/type correctness
 - `92c674e621426b7607c1c6bec5eff55503210ff2` — restore literal Pixi event-detach invariant
-- `e22b11259d0bd2dcae7f70bda323839ed9976457` — live DPR/context retained-resource lifecycle handoff
+- `e22b11259d0bd2dcae7f70bda323839ed9976457` — initial live-DPR retained-generation handoff
 - `e12d3df956e33baf2ab55e84048f89b91827eb14` — remove recurring Pixi renderer scheduler RAF
-- `7d15a4ba119ba9fde98901c1b5cb04e58195aae4` — explicitly release retired view textures while preserving density-shared stream assets
 
 `SOL_CONTINUATION_POLICY.md` requires this to be one consolidated evidence pass after Work Packages A, B and C. Luna is an evidence instrument only.
 
@@ -20,23 +29,34 @@ Production fix commits to verify:
 
 Do **not** edit production source, tests, harness code, dependencies, configuration, or documentation. Do **not** redesign or broadly debug. Return raw evidence for Sol to interpret.
 
-The source-level diagnoses being verified are:
+The current Sol-owned source diagnoses/fixes being verified are:
 
-1. Build/type correctness: the authored reusable `Float64Array` storage contract compiles, and the intentional Pixi `setTargetElement(null)` runtime call remains literal with a narrow TypeScript suppression.
-2. Live DPR/context lifecycle: density/context rebuilds previously destroyed old retained Pixi view roots before Pixi's retained render instructions had crossed to the replacement scene generation. Old views are now retired through the first replacement render and destroyed afterward. Each glass view destroys its private generated texture sources; stream halo/cap textures use density-keyed leases so old sources are released only after their last view is retired. Shared `Texture.WHITE` and the reusable circle texture remain shared.
-3. Idle RAF: Pixi 8.18's renderer `SchedulerSystem` registers on `Ticker.system` for periodic renderer GC even when the application ticker and EventTicker are stopped. This fixed retained scene now disables renderer GC scheduling and destroys that scheduler listener, leaving `FrameGate` as the production animation gate.
+1. **Build/type correctness** — the authored reusable `Float64Array` storage contract compiles, and the intentional Pixi `setTargetElement(null)` runtime call remains literal with a narrow TypeScript suppression.
+2. **Live DPR lifecycle** — a density change still creates a new retained Pixi view generation because DPR-sensitive glow/stream raster assets must be rebaked. The removed generation is retained until the first successful replacement render, then its private generated textures plus its `MeshSimple` geometries/buffers are explicitly destroyed. Shared `Texture.WHITE` and the reusable circle texture are not destroyed.
+3. **WebGL context restoration** — context restore no longer rebuilds the STILLLIGHT view graph. PixiJS 8.18's own `contextChange` systems invalidate context-bound geometry/buffer GPU data and recreate it lazily from the retained CPU resources on the next render. STILLLIGHT's restore listener only invalidates through `onRestore()`.
+4. **Idle RAF** — PixiJS 8.18's renderer `SchedulerSystem` registers on `Ticker.system` for periodic renderer GC even with the application ticker stopped. This fixed retained scene disables renderer GC scheduling and destroys that scheduler listener, leaving `FrameGate` as the production animation gate.
 
 ## Sol source review and deferred evidence
 
-Sol reviewed the complete B/C ownership path and the exact source diffs. The focused structural regression test failed against the prior view-root teardown, then passed after explicit texture ownership was added: `node --test tests/renderer-structure.test.mjs` — 7/7 PASS. `git diff --check` reported no whitespace errors; PowerShell/Git emitted only the expected LF-to-CRLF normalization warnings.
+Sol reviewed the complete current B/C ownership path and exact diff. The review specifically checked:
 
-The following evidence remains queued for this single Luna pass:
+- renderer/context generation boundaries
+- fresh-load vs live-DPR transition behavior
+- retained `MeshSimple` geometry/buffer lifetime
+- private vs shared texture ownership
+- context-loss/restoration semantics in PixiJS 8.18
+- explicit teardown now that renderer GC scheduling is disabled
+- Canvas fallback isolation
+- authored model/timing isolation
+- structural tests for context retention, DPR retirement, explicit resource teardown, and background RAF owners
+
+No runtime PASS is claimed by this document. All executable evidence below remains pending for this consolidated Luna pass.
 
 | Pending evidence | Why needed | Blocking before handoff? |
 |---|---|---|
-| `npm run verify:fast` | Build, unit, and reference gates for all A/B/C source changes, including the structural ownership guard | No |
-| `npm run verify:viewport` | Observe live DPR and same-page resize behavior after view-generation retirement | No |
-| `npm run verify:context` | Observe WebGL context restoration and frame/state recovery | No |
+| `npm run verify:fast` | Build, unit, structural, and reference gates for all current Sol-owned A/B/C source | No |
+| `npm run verify:viewport` | Observe live DPR and same-page resize behavior after retained-generation retirement | No |
+| `npm run verify:context` | Confirm retained view/resources recover through real WebGL context restoration | No |
 | `npm run verify:idle-raf` | Measure settled idle and active animation RAF requests after scheduler removal | No |
 | `npm run verify:m1` | Final broad acceptance after all targeted prerequisites pass | Run once only if the first four checks pass |
 
