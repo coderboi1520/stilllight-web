@@ -14,18 +14,10 @@ function fpsFromFrameTime(frameMs) {
   return frameMs && frameMs > 0 ? 1000 / frameMs : null;
 }
 
+// The benchmark has one authoritative workload: ten glasses with deliberate
+// two- and three-pour overlap plus hint/invalid feedback. Keep this script
+// deterministic so the retained Pixi architecture can replay it later.
 export const BENCHMARK_SCRIPTS = Object.freeze({
-  '2-glass': Object.freeze({
-    durationMs: 5000,
-    events: Object.freeze([
-      { at: 500, type: 'selection', index: 0 },
-      { at: 500, type: 'hint', source: 0, target: 1 },
-      { at: 1100, type: 'invalid', source: 0, target: 1 },
-      { at: 1700, type: 'pours', pairs: [[0, 1]] },
-      { at: 3300, type: 'hint', source: 0, target: 1 },
-      { at: 4000, type: 'invalid', source: 0, target: 1 },
-    ]),
-  }),
   '10-glass': Object.freeze({
     durationMs: 15000,
     events: Object.freeze([
@@ -64,7 +56,7 @@ export class BenchmarkStats {
   }
 
   resetSamples() {
-    this.mode = '2-glass';
+    this.mode = '10-glass';
     this.startedAt = 0;
     this.previousFrameAt = null;
     this.lastOverlayAt = -Infinity;
@@ -87,7 +79,8 @@ export class BenchmarkStats {
     this.heapDeltaBytes = UNAVAILABLE;
   }
 
-  start(mode, now = performance.now()) {
+  start(mode = '10-glass', now = performance.now()) {
+    if (!BENCHMARK_SCRIPTS[mode]) throw new Error(`Unknown benchmark mode: ${mode}`);
     this.cancel();
     this.resetSamples();
     this.mode = mode;
@@ -135,9 +128,7 @@ export class BenchmarkStats {
   beginFrame(now) {
     if (!this.running) return;
     this.rafCallbacks += 1;
-    if (this.previousFrameAt !== null) {
-      this.frameTimes.push(now - this.previousFrameAt);
-    }
+    if (this.previousFrameAt !== null) this.frameTimes.push(now - this.previousFrameAt);
     this.previousFrameAt = now;
   }
 
@@ -201,8 +192,7 @@ export class BenchmarkStats {
   }
 
   shouldFinish(now) {
-    if (!this.running) return false;
-    return now - this.startedAt >= BENCHMARK_SCRIPTS[this.mode].durationMs;
+    return this.running && now - this.startedAt >= BENCHMARK_SCRIPTS[this.mode].durationMs;
   }
 
   complete(now = performance.now()) {
@@ -266,6 +256,7 @@ export class BenchmarkStats {
     this.running = false;
     this.onComplete(result);
     console.log(`STILLLIGHT_BENCHMARK_RESULT ${JSON.stringify(result)}`);
+    window.dispatchEvent(new CustomEvent('stilllight-benchmark-complete', { detail: result }));
     return result;
   }
 }
