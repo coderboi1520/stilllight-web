@@ -161,12 +161,16 @@ export function makeShineTexture(){
   canvas.height=316;
   const ctx=canvas.getContext('2d')!;
   ctx.scale(2,2);
-  const g=ctx.createLinearGradient(0,0,68,0);
-  g.addColorStop(0,'#ffffff38');
-  g.addColorStop(.18,'#ffffff07');
-  g.addColorStop(.86,'#ffffff00');
-  g.addColorStop(1,'#ffffff34');
+  ctx.save();
+  ctx.translate(15,79);
+  ctx.scale(.26,1);
+  const g=ctx.createRadialGradient(0,0,0,0,0,70);
+  g.addColorStop(0,'rgba(236,249,255,.14)');
+  g.addColorStop(.34,'rgba(236,249,255,.09)');
+  g.addColorStop(.72,'rgba(236,249,255,.025)');
+  g.addColorStop(1,'rgba(236,249,255,0)');
   ctx.fillStyle=g;
-  ctx.fillRect(0,0,68,158);
+  ctx.fillRect(-70,-70,140,140);
+  ctx.restore();
   return rawCanvasTexture(canvas);
 }
