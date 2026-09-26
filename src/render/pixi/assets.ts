@@ -127,8 +127,8 @@ export function makeGlassBaseTexture(){
   return glassSurfaceTexture(ctx=>{
     const shade=ctx.createLinearGradient(0,118,0,158);
     shade.addColorStop(0,'rgba(4,16,22,0)');
-    shade.addColorStop(.58,'rgba(4,16,22,.022)');
-    shade.addColorStop(1,'rgba(4,16,22,.095)');
+    shade.addColorStop(.58,'rgba(4,16,22,.025)');
+    shade.addColorStop(1,'rgba(4,16,22,.107)');
     ctx.fillStyle=shade;
     ctx.fillRect(0,118,68,40);
 
@@ -136,8 +136,8 @@ export function makeGlassBaseTexture(){
     ctx.translate(34,153);
     ctx.scale(1,.28);
     const lift=ctx.createRadialGradient(0,0,4,0,0,32);
-    lift.addColorStop(0,'rgba(225,245,249,.04)');
-    lift.addColorStop(.55,'rgba(225,245,249,.016)');
+    lift.addColorStop(0,'rgba(225,245,249,.045)');
+    lift.addColorStop(.55,'rgba(225,245,249,.018)');
     lift.addColorStop(1,'rgba(225,245,249,0)');
     ctx.fillStyle=lift;
     ctx.fillRect(-34,-34,68,68);
@@ -230,9 +230,9 @@ export function makeShineTexture(){
     ctx.translate(15,79);
     ctx.scale(.26,1);
     const g=ctx.createRadialGradient(0,0,0,0,0,70);
-    g.addColorStop(0,'rgba(236,249,255,.14)');
-    g.addColorStop(.34,'rgba(236,249,255,.09)');
-    g.addColorStop(.72,'rgba(236,249,255,.025)');
+    g.addColorStop(0,'rgba(236,249,255,.157)');
+    g.addColorStop(.34,'rgba(236,249,255,.101)');
+    g.addColorStop(.72,'rgba(236,249,255,.028)');
     g.addColorStop(1,'rgba(236,249,255,0)');
     ctx.fillStyle=g;
     ctx.fillRect(-70,-70,140,140);
