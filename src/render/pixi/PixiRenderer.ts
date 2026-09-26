@@ -28,6 +28,10 @@ export class PixiRenderer{
     // TypeScript declaration narrows the parameter to HTMLElement.
     // @ts-expect-error intentional Pixi declaration/runtime mismatch
     this.app.renderer.events.setTargetElement(null);
+    // This scene is rendered only through FrameGate. Pixi 8.18's renderer
+    // scheduler otherwise keeps Ticker.system alive solely for periodic GC.
+    this.app.renderer.gc.enabled=false;
+    this.app.renderer.scheduler.destroy();
     host.appendChild(this.app.canvas);
     this.app.stage.addChild(this.scene);
     this.rebuildViews(false);
