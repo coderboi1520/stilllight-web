@@ -79,6 +79,22 @@ test('DPR view generations retire after replacement render and release private P
   assert.match(stream,/this\.haloTexture\.destroy\(true\);this\.haloCapTexture\.destroy\(true\)/);
 });
 
+test('viewport controller explicitly watches DPR-only changes without RAF polling',()=>{
+  const viewport=read('../src/render/ViewportController.ts');
+  assert.match(viewport,/window\.matchMedia\(`\(resolution: \$\{dpr\}dppx\)`\)/);
+  assert.match(viewport,/addEventListener\('change',this\.dprHandler\)/);
+  assert.match(viewport,/removeEventListener\('change',this\.dprHandler\)/);
+  assert.match(viewport,/private dprHandler=\(\)=>\{this\.bindDprWatcher\(\);this\.sync\(\);\}/);
+  assert.doesNotMatch(viewport,/requestAnimationFrame/);
+});
+
+test('idle RAF harness resets startup requests before measuring settled idle',()=>{
+  const idle=read('../scripts/verification/verify-idle-raf.mjs');
+  const settled=idle.slice(idle.indexOf('await harness.goto(page)'),idle.indexOf('const first='));
+  assert.match(settled,/waitForFunction\(\(\)=>!!window\.__STILLLIGHT_PIXI__\)/);
+  assert.match(settled,/__rafProbe\.reset\(\)/);
+});
+
 test('explicit Canvas fallback covers liquid, transform, stream and impact primitives',()=>{
   const stage=read('../src/render/StageRenderer.ts');
   const canvas=read('../src/render/CanvasRenderer.ts');

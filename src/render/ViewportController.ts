@@ -5,12 +5,16 @@ export function viewportState(width:number,height:number,dpr:number):ViewportSta
 
 export class ViewportController{
   private observer:ResizeObserver|null=null;
+  private dprQuery:MediaQueryList|null=null;
   private last='';
   private board:HTMLElement;
   private apply:(state:ViewportState)=>void;
   private invalidate:()=>void;
+  private syncHandler=()=>this.sync();
+  private dprHandler=()=>{this.bindDprWatcher();this.sync();};
   constructor(board:HTMLElement,apply:(state:ViewportState)=>void,invalidate:()=>void){this.board=board;this.apply=apply;this.invalidate=invalidate;}
-  start(){const sync=()=>this.sync();this.observer=new ResizeObserver(sync);this.observer.observe(this.board);window.addEventListener('resize',sync,{passive:true});this.sync();}
+  private bindDprWatcher(){this.dprQuery?.removeEventListener('change',this.dprHandler);const dpr=window.devicePixelRatio||1;this.dprQuery=window.matchMedia(`(resolution: ${dpr}dppx)`);this.dprQuery.addEventListener('change',this.dprHandler);}
+  start(){this.observer=new ResizeObserver(this.syncHandler);this.observer.observe(this.board);window.addEventListener('resize',this.syncHandler,{passive:true});this.bindDprWatcher();this.sync();}
   sync(){const r=this.board.getBoundingClientRect(),state=viewportState(r.width,r.height,window.devicePixelRatio||1),key=`${state.width}x${state.height}@${state.density}`;if(key===this.last)return;this.last=key;this.apply(state);this.invalidate();}
-  stop(){this.observer?.disconnect();this.observer=null;}
+  stop(){this.observer?.disconnect();this.observer=null;window.removeEventListener('resize',this.syncHandler);this.dprQuery?.removeEventListener('change',this.dprHandler);this.dprQuery=null;}
 }
