@@ -27,28 +27,13 @@ function drawRim(ctx:CanvasRenderingContext2D){
 }
 
 let assetDensity=Math.min(typeof devicePixelRatio==='number'&&devicePixelRatio>0?devicePixelRatio:1,2);
-type StreamTextureGeneration={density:number;halo:Texture;cap:Texture;references:number};
-const streamTextureGenerations:StreamTextureGeneration[]=[];
-
-function disposeUnusedStreamTextureGenerations(){
-  for(let i=streamTextureGenerations.length-1;i>=0;i--){
-    const generation=streamTextureGenerations[i];
-    if(generation.references!==0||Math.abs(generation.density-assetDensity)<1e-6)continue;
-    streamTextureGenerations.splice(i,1);
-    generation.halo.destroy(true);
-    generation.cap.destroy(true);
-  }
-}
-
 export function configureAssetDensity(density:number){
   const next=Math.max(1,Math.min(density||1,2));
   if(Math.abs(next-assetDensity)<1e-6)return false;
   assetDensity=next;
-  disposeUnusedStreamTextureGenerations();
   return true;
 }
 function cappedDensity(){return assetDensity;}
-
 
 function canvasTexture(draw:(ctx:CanvasRenderingContext2D)=>void,scale=2){
   const canvas=document.createElement('canvas');
@@ -168,27 +153,6 @@ export function makeStreamHaloCapTexture(){
     ctx.fill();
   });
   return rawCanvasTexture(canvas);
-}
-
-export function acquireStreamTextures(){
-  let generation=streamTextureGenerations.find(item=>Math.abs(item.density-assetDensity)<1e-6);
-  if(!generation){
-    generation={density:assetDensity,halo:makeStreamHaloTexture(),cap:makeStreamHaloCapTexture(),references:0};
-    streamTextureGenerations.push(generation);
-  }
-  const current=generation;
-  current.references++;
-  let released=false;
-  return{
-    halo:current.halo,
-    cap:current.cap,
-    release(){
-      if(released)return;
-      released=true;
-      current.references--;
-      disposeUnusedStreamTextureGenerations();
-    },
-  };
 }
 
 export function makeShineTexture(){

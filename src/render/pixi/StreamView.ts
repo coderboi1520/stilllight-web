@@ -1,7 +1,7 @@
 import { Container,MeshSimple,Sprite,Texture } from 'pixi.js';
 import { COLORS } from '../../core/constants.ts';
 import type {StreamFrame} from '../../core/RenderFrame.ts';
-import {acquireStreamTextures,getCircleTexture} from './assets.ts';
+import {getCircleTexture,makeStreamHaloCapTexture,makeStreamHaloTexture} from './assets.ts';
 
 const CURVE_SEGMENTS=32;
 const CURVE_SAMPLES=CURVE_SEGMENTS+1;
@@ -38,6 +38,8 @@ class CurveStroke{
     this.endCap.width=this.endCap.height=capSize;
     this.root.addChild(this.mesh,this.startCap,this.endCap);
   }
+
+  destroy(){const geometry=this.mesh.geometry;this.root.destroy({children:true});geometry.destroy(true);}
 
   update(center:Float64Array,normals:Float64Array,color:string,alpha:number){
     const half=this.width*.5;
@@ -79,6 +81,8 @@ class ImpactRing{
     this.root.visible=false;
   }
 
+  destroy(){const geometry=this.mesh.geometry;this.root.destroy({children:true});geometry.destroy(true);}
+
   update(x:number,y:number,impact:number){
     if(impact<=0){this.root.visible=false;return;}
     this.root.visible=true;
@@ -98,8 +102,9 @@ export class StreamView{
   root=new Container();
   private center=new Float64Array(CURVE_SAMPLES*2);
   private normals=new Float64Array(CURVE_SAMPLES*2);
-  private streamTextures=acquireStreamTextures();
-  private halo=new CurveStroke(STREAM_HALO_SPAN,this.streamTextures.halo,this.streamTextures.cap,STREAM_HALO_SPAN);
+  private haloTexture=makeStreamHaloTexture();
+  private haloCapTexture=makeStreamHaloCapTexture();
+  private halo=new CurveStroke(STREAM_HALO_SPAN,this.haloTexture,this.haloCapTexture,STREAM_HALO_SPAN);
   private colorStroke=new CurveStroke(5.8);
   private core=new CurveStroke(1.8);
   private impact=new ImpactRing();
@@ -113,8 +118,9 @@ export class StreamView{
   destroy(){
     if(this.destroyed)return;
     this.destroyed=true;
-    this.root.destroy({children:true});
-    this.streamTextures.release();
+    this.halo.destroy();this.colorStroke.destroy();this.core.destroy();this.impact.destroy();
+    this.root.destroy();
+    this.haloTexture.destroy(true);this.haloCapTexture.destroy(true);
   }
 
   update(stream:StreamFrame|null){

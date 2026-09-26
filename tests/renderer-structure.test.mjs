@@ -24,9 +24,8 @@ test('stream is retained, Canvas-profile halo follows stream fade, and impact al
   const stream=read('../src/render/pixi/StreamView.ts');
   const assets=read('../src/render/pixi/assets.ts');
   assert.doesNotMatch(stream,/\.clear\(\)/);
-  assert.match(stream,/acquireStreamTextures\(\)/);
-  assert.match(assets,/halo:makeStreamHaloTexture\(\),cap:makeStreamHaloCapTexture\(\)/);
-  assert.match(assets,/generation\.references!==0\|\|Math\.abs\(generation\.density-assetDensity\)<1e-6/);
+  assert.match(stream,/makeStreamHaloTexture\(\)/);
+  assert.match(stream,/makeStreamHaloCapTexture\(\)/);
   assert.match(stream,/this\.halo\.update\(this\.center,this\.normals,color,stream\.alpha\)/);
   assert.match(assets,/ctx\.shadowBlur=STREAM_BLUR/);
   assert.match(assets,/globalCompositeOperation='destination-out'/);
@@ -51,28 +50,33 @@ test('render hot path does not re-add scene children every frame',()=>{
   assert.match(renderer,/ensureDrawOrder/);
 });
 
-test('Pixi idle event RAF source is detached and context restoration invalidates explicitly',()=>{
+test('Pixi background RAF owners are detached and context restoration retains the view graph',()=>{
   const renderer=read('../src/render/pixi/PixiRenderer.ts');
   assert.match(renderer,/renderer\.events\.setTargetElement\(null\)/);
+  assert.match(renderer,/renderer\.gc\.enabled=false/);
+  assert.match(renderer,/renderer\.scheduler\.destroy\(\)/);
   assert.match(renderer,/webglcontextrestored/);
-  assert.match(renderer,/this\.onRestore\(\)/);
+  assert.match(renderer,/private restoreHandler=\(\)=>\{this\.onRestore\(\);\}/);
+  assert.doesNotMatch(renderer,/restoreHandler=\(\)=>\{this\.rebuildViews/);
   assert.doesNotMatch(renderer,/requestAnimationFrame/);
 });
 
-test('rebuilt Pixi view generations release their owned image texture sources',()=>{
+test('DPR view generations retire after replacement render and release private Pixi resources',()=>{
   const renderer=read('../src/render/pixi/PixiRenderer.ts');
   const glass=read('../src/render/pixi/GlassView.ts');
+  const liquid=read('../src/render/pixi/LiquidView.ts');
   const stream=read('../src/render/pixi/StreamView.ts');
-  const assets=read('../src/render/pixi/assets.ts');
   assert.match(renderer,/private retiredViews:\(GlassView\|StreamView\)\[\]=\[\]/);
   assert.match(renderer,/this\.app\.renderer\.render\(this\.app\.stage\);this\.destroyRetiredViews\(\)/);
   assert.match(renderer,/this\.glasses\?\.forEach\(view=>view\.destroy\(\)\)/);
   assert.match(glass,/private ownedTextures:Texture\[\]/);
+  assert.match(glass,/this\.liquid\.destroy\(\)/);
   assert.match(glass,/for\(const texture of this\.ownedTextures\)texture\.destroy\(true\)/);
-  assert.match(stream,/private streamTextures=acquireStreamTextures\(\)/);
-  assert.match(stream,/this\.streamTextures\.release\(\)/);
-  assert.match(assets,/current\.references--;\s*disposeUnusedStreamTextureGenerations\(\)/);
-  assert.match(assets,/generation\.references!==0\|\|Math\.abs\(generation\.density-assetDensity\)<1e-6[\s\S]*generation\.halo\.destroy\(true\)[\s\S]*generation\.cap\.destroy\(true\)/);
+  assert.match(liquid,/fillGeometry\.destroy\(true\);lineGeometry\.destroy\(true\)/);
+  assert.match(stream,/private haloTexture=makeStreamHaloTexture\(\)/);
+  assert.match(stream,/private haloCapTexture=makeStreamHaloCapTexture\(\)/);
+  assert.match(stream,/geometry\.destroy\(true\)/);
+  assert.match(stream,/this\.haloTexture\.destroy\(true\);this\.haloCapTexture\.destroy\(true\)/);
 });
 
 test('explicit Canvas fallback covers liquid, transform, stream and impact primitives',()=>{

@@ -78,6 +78,7 @@ export class GlassView{
   destroy(){
     if(this.destroyed)return;
     this.destroyed=true;
+    this.liquid.destroy();
     this.root.destroy({children:true});
     for(const texture of this.ownedTextures)texture.destroy(true);
     this.ownedTextures.length=0;

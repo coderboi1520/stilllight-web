@@ -16,7 +16,7 @@ export class PixiRenderer{
   private movingIndex=-2;
   private density=1;
   private onRestore:()=>void=()=>{};
-  private restoreHandler=()=>{this.rebuildViews(true);this.onRestore();};
+  private restoreHandler=()=>{this.onRestore();};
 
   async init(host:HTMLElement,onRestore:()=>void){
     this.onRestore=onRestore;
