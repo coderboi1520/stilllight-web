@@ -94,7 +94,7 @@ export class StilllightModel{
       frame.layers.length=visibleCount;
       for(let i=0;i<visibleCount;i++)frame.layers[i]=slots[i];
       frame.surfaceAngle=surfaceAngle;frame.relativeLiquidRotation=-frame.pose.angle+surfaceAngle;frame.wave=wave;frame.phase=phase;frame.dynamicLiquid=movingLiquid;frame.selected=this.selected===index;
-      frame.hintRole=hint?.source===index&&!moving?'source':hint?.target===index?'target':null;
+      frame.hintRole=moving?null:hint?.source===index?'source':hint?.target===index?'target':null;
       frame.invalid=this.invalidSource===index||this.invalidTarget===index;frame.moving=moving;
       return frame;
     };

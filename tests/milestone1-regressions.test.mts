@@ -6,6 +6,7 @@ import {snapshotFrame} from '../src/debug/snapshot.ts';
 import {viewportState} from '../src/render/ViewportController.ts';
 import {FrameGate} from '../src/runtime/FrameGate.ts';
 import {selectBackend} from '../src/render/backendPolicy.ts';
+import {CanvasRenderer} from '../src/render/CanvasRenderer.ts';
 const T=10000;
 
 test('authored durations are pinned independently of candidate timing math',()=>{assert.equal(POUR_MS,1040);assert.equal(SELECT_MS,300);assert.equal(INVALID_MS,420);assert.equal(SETTLE_MS,440);assert.equal(HINT_ATTENTION_MS,680);});
@@ -13,6 +14,8 @@ test('authored durations are pinned independently of candidate timing math',()=>
 test('moving source suppresses hint emphasis while target hint remains valid',()=>{const m=new StilllightModel();m.hint(T);assert.equal(m.startPour(T+100),true);const frame=m.sample(T+150);assert.equal(frame.glasses[0].moving,true);assert.equal(frame.glasses[0].hintRole,null);assert.equal(frame.glasses[1].hintRole,'target');});
 
 test('selection then hint then pour also suppresses moving-source hint',()=>{const m=new StilllightModel();m.choose(0,T);m.hint(T+10);m.choose(1,T+20);const frame=m.sample(T+70);assert.equal(frame.glasses[0].moving,true);assert.equal(frame.glasses[0].hintRole,null);assert.equal(frame.glasses[1].hintRole,'target');});
+
+test('selection then hint then reverse pour suppresses moving-target hint',()=>{const m=new StilllightModel();m.choose(1,T);m.hint(T+10);m.choose(0,T+20);const frame=m.sample(T+70);assert.equal(frame.glasses[1].moving,true);assert.equal(frame.glasses[1].hintRole,null);assert.equal(frame.glasses[0].hintRole,'source');});
 
 test('hint expiry clears both hint roles',()=>{const m=new StilllightModel();m.hint(T);m.advanceAfterFrame(T+HINT_ATTENTION_MS);const frame=m.sample(T+HINT_ATTENTION_MS);assert.equal(frame.glasses[0].hintRole,null);assert.equal(frame.glasses[1].hintRole,null);});
 
@@ -23,3 +26,29 @@ test('viewport coordination caps DPR and computes responsive backing stores',()=
 test('parity clock gate cancels production RAF and blocks contamination until exit',()=>{let requested=0,cancelled:number[]=[],ran:number[]=[];const callbacks=new Map<number,(t:number)=>void>();const gate=new FrameGate(cb=>{const id=++requested;callbacks.set(id,cb);return id;},id=>cancelled.push(id),t=>ran.push(t));assert.equal(gate.schedule(),true);assert.equal(gate.schedule(),false);gate.enterParity();assert.deepEqual(cancelled,[1]);callbacks.get(1)?.(101);assert.deepEqual(ran,[]);assert.equal(gate.schedule(),false);gate.exitParity();assert.equal(gate.schedule(),true);callbacks.get(2)?.(202);assert.deepEqual(ran,[202]);assert.equal(gate.isPending(),false);});
 
 test('GPU availability selects WebGL and unavailability selects intentional Canvas fallback',()=>{assert.equal(selectBackend(true),'webgl');assert.equal(selectBackend(false),'canvas');});
+
+test('Canvas composes each glass once, shines inside its unrotated clip, and uses authored invalid rim widths',()=>{
+  const calls=[];const state={rotation:0,clipped:false,fillStyle:null,strokeStyle:null,lineWidth:1,shadowBlur:0,shadowColor:null};const stack=[];
+  const ctx={...state,
+    save(){stack.push({rotation:this.rotation,clipped:this.clipped,fillStyle:this.fillStyle,strokeStyle:this.strokeStyle,lineWidth:this.lineWidth,shadowBlur:this.shadowBlur,shadowColor:this.shadowColor});},
+    restore(){Object.assign(this,stack.pop());},translate(){},rotate(angle){this.rotation+=angle;},setTransform(){this.rotation=0;},clearRect(){},
+    beginPath(){this.path=null;},moveTo(){},lineTo(){},quadraticCurveTo(){},closePath(){},
+    clip(){this.clipped=true;calls.push({kind:'clip'});},
+    fill(){calls.push({kind:'fill',style:this.fillStyle,shadow:this.shadowColor,blur:this.shadowBlur});},
+    fillRect(x,y,w,h){calls.push({kind:'fillRect',x,y,w,h,style:this.fillStyle,clipped:this.clipped,rotation:this.rotation});},
+    ellipse(){this.path='rim';},stroke(){calls.push({kind:'stroke',path:this.path,width:this.lineWidth,blur:this.shadowBlur});},
+    createLinearGradient(...args){const gradient={args,stops:[],addColorStop(at,color){this.stops.push([at,color]);}};calls.push({kind:'gradient',gradient});return gradient;}
+  };
+  const originalDocument=globalThis.document;globalThis.document={createElement:()=>({getContext:()=>ctx})};
+  try{
+    const renderer=new CanvasRenderer(),model=new StilllightModel();model.startPour(T);const frame=model.sample(T+500);renderer.render(frame);
+    const body=calls.filter(c=>c.kind==='fill'&&c.style==='rgba(12,31,42,.78)');assert.equal(body.length,2);assert.ok(body.every(c=>c.shadow==='#000'&&c.blur===7));
+    const firstBody=calls.findIndex(c=>c.kind==='fill'&&c.style==='rgba(12,31,42,.78)'),firstClip=calls.findIndex(c=>c.kind==='clip'),firstShine=calls.findIndex(c=>c.kind==='fillRect'&&c.style?.stops),firstWall=calls.findIndex(c=>c.kind==='stroke'&&c.width===1.6);assert.ok(firstBody<firstClip&&firstClip<firstShine&&firstShine<firstWall);
+    const shines=calls.filter(c=>c.kind==='fillRect'&&c.style?.stops);assert.equal(shines.length,2);
+    for(const shine of shines){assert.deepEqual([shine.x,shine.y,shine.w,shine.h],[-34,0,68,158]);assert.equal(shine.clipped,true);assert.deepEqual(shine.style.args,[-34,0,34,0]);assert.deepEqual(shine.style.stops,[[0,'#ffffff38'],[.18,'#ffffff07'],[.86,'#ffffff00'],[1,'#ffffff34']]);}
+    assert.equal(shines[0].rotation,frame.glasses[1].pose.angle);assert.equal(shines[1].rotation,frame.glasses[0].pose.angle);
+    calls.length=0;model.reset();model.invalid(T+1000);renderer.render(model.sample(T+1100));
+    const invalidRims=calls.filter(c=>c.kind==='stroke'&&c.path==='rim'&&c.blur===12);assert.equal(invalidRims.length,2);assert.ok(invalidRims.every(c=>c.width===3));
+    assert.ok(calls.some(c=>c.kind==='stroke'&&c.path==='rim'&&c.blur===0&&c.width===1.4));
+  }finally{if(originalDocument===undefined)delete globalThis.document;else globalThis.document=originalDocument;}
+});

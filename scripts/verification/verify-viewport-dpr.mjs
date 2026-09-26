@@ -33,12 +33,20 @@ export async function run(harness) {
     if (selected !== 0) throw new Error(`hit alignment/select failed: selected=${selected}`);
     metrics = await harness.setDeviceMetrics(page, { width: 320,height:496,dpr:1 }); await page.waitForTimeout(200); await metrics.detach();
     const before = await inspect(page);
+    await page.evaluate(() => { const query=matchMedia('(resolution: 1dppx)'); window.__dprNotification={initial:query.matches,changes:[],resizes:0};query.addEventListener('change',event=>window.__dprNotification.changes.push({matches:event.matches,dpr:devicePixelRatio}));window.addEventListener('resize',()=>window.__dprNotification.resizes++); });
     metrics = await harness.setDeviceMetrics(page, { width: 320,height:496,dpr:2 }); await page.waitForTimeout(300);
-    const after = await inspect(page); await page.screenshot({ path: `${dir}/dpr-live-change-fail.png` }); artifacts.push(`${dir}/dpr-live-change-fail.png`);
+    const after = await inspect(page);
+    const notification=await page.evaluate(()=>({...window.__dprNotification,query1:matchMedia('(resolution: 1dppx)').matches,query2:matchMedia('(resolution: 2dppx)').matches}));
+    await page.locator('[data-glass="0"]').click(); await page.locator('[data-glass="1"]').click();
+    const selectedAfter=await page.evaluate(()=>window.__STILLLIGHT_PIXI__.state().selected);
+    const picture=await page.screenshot({ path: `${dir}/dpr-live-change-fail.png` }); artifacts.push(`${dir}/dpr-live-change-fail.png`);
+    const painted=await page.evaluate(async png=>{const image=new Image();image.src=png;await image.decode();const copy=document.createElement('canvas');copy.width=image.width;copy.height=image.height;const context=copy.getContext('2d');context.drawImage(image,0,0);const pixels=context.getImageData(0,0,copy.width,copy.height).data;let count=0;for(let i=0;i<pixels.length;i+=4)if(pixels[i]>45||pixels[i+1]>55||pixels[i+2]>65)count++;return count},`data:image/png;base64,${picture.toString('base64')}`);
     await metrics.detach();
     if (errors.length) throw Object.assign(new Error(errors.join('; ')), { artifacts });
+    if (!notification.initial || !notification.changes.some(change=>change.matches===false&&change.dpr===2) || notification.query1 || !notification.query2) throw Object.assign(new Error(`DPR notification path failed: ${JSON.stringify(notification)}`), { artifacts });
+    if(selectedAfter!==1||painted===0)throw Object.assign(new Error(`DPR scene/hit failure: selected=${selectedAfter}, painted=${painted}`),{artifacts});
     // A live DPR change must rebuild the backing store for the new effective density.
-    if (after.backing[0] !== Math.round(after.css[0]*2) || after.backing[1] !== Math.round(after.css[1]*2) || (after.dpr === 2 && after.backing[0] === before.backing[0] && after.backing[1] === before.backing[1])) throw Object.assign(new Error(`DPR_LIVE_CHANGE: FAIL\nbefore: ${JSON.stringify(before)}\nafter: ${JSON.stringify(after)}\npage errors: ${errors.join('; ')||'none'}`), { artifacts });
+    if (after.backing[0] !== Math.round(after.css[0]*2) || after.backing[1] !== Math.round(after.css[1]*2) || (after.dpr === 2 && after.backing[0] === before.backing[0] && after.backing[1] === before.backing[1])) throw Object.assign(new Error(`DPR_LIVE_CHANGE: FAIL\nbefore: ${JSON.stringify(before)}\nafter: ${JSON.stringify(after)}\nnotification: ${JSON.stringify(notification)}\npage errors: ${errors.join('; ')||'none'}`), { artifacts });
     return makeResult(name,'PASS',started,`cases=${JSON.stringify(cases)}; after=${JSON.stringify(after)}`,artifacts);
   } catch (error) { return makeResult(name,'FAIL',started,error.message,error.artifacts ?? artifacts); }
   finally { await pageCtx?.context.close().catch(()=>{}); }

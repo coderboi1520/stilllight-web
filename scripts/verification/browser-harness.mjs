@@ -75,6 +75,9 @@ export async function withVerificationHarness(options, fn) {
       setDeviceMetrics: async (page, { width, height, dpr }) => {
         const cdp = await page.context().newCDPSession(page);
         await cdp.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: dpr, mobile: false });
+        // Chromium can update devicePixelRatio without updating CSS resolution queries.
+        // Emulate both halves of a real DPR transition so matchMedia change reaches the app.
+        await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'resolution', value: `${dpr}dppx` }] });
         return cdp;
       },
       goto: async (page, suffix = '/') => page.goto(`${baseURL.replace(/\/$/, '')}${suffix}`, { waitUntil: 'networkidle', timeout: 20000 }),

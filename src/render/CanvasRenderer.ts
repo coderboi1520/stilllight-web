@@ -26,11 +26,13 @@ export class CanvasRenderer{
 
   private glass(frame:GlassFrame){
     const ctx=this.ctx;ctx.save();ctx.translate(frame.pose.x,frame.pose.y);ctx.rotate(frame.pose.angle);
-    ctx.save();ctx.shadowColor='rgba(0,0,0,.8)';ctx.shadowBlur=7;ctx.fillStyle='rgba(12,31,42,.78)';closedGlassPath(ctx);ctx.fill();ctx.restore();
-    ctx.fillStyle='rgba(12,31,42,.78)';closedGlassPath(ctx);ctx.fill();
-    ctx.save();closedGlassPath(ctx);ctx.clip();ctx.rotate(frame.relativeLiquidRotation);for(const layer of frame.layers)this.layer(ctx,layer);ctx.restore();
+    ctx.save();ctx.shadowColor='#000';ctx.shadowBlur=7;ctx.fillStyle='rgba(12,31,42,.78)';closedGlassPath(ctx);ctx.fill();ctx.restore();
+    ctx.save();closedGlassPath(ctx);ctx.clip();
+    ctx.save();ctx.rotate(frame.relativeLiquidRotation);for(const layer of frame.layers)this.layer(ctx,layer);ctx.restore();
+    const shine=ctx.createLinearGradient(-34,0,34,0);shine.addColorStop(0,'#ffffff38');shine.addColorStop(.18,'#ffffff07');shine.addColorStop(.86,'#ffffff00');shine.addColorStop(1,'#ffffff34');ctx.fillStyle=shine;ctx.fillRect(-34,0,68,158);
+    ctx.restore();
     const glow=frame.invalid?'#ff8e94':frame.hintRole==='source'?'#f5d38e':frame.hintRole==='target'?'#83e0d4':frame.selected?'#f5d38e':null;
-    if(glow){ctx.save();ctx.shadowColor=glow;ctx.shadowBlur=frame.invalid?12:16;outline(ctx,glow,frame.invalid?3:2.4,glow,frame.invalid?1.4:2.4);ctx.restore();}
+    if(glow){ctx.save();ctx.shadowColor=glow;ctx.shadowBlur=frame.invalid?12:16;outline(ctx,glow,frame.invalid?3:2.4,glow,frame.invalid?3:2.4);ctx.restore();}
     if(frame.invalid)outline(ctx,'#ff8e94',3,'#ffb0b5',1.4);else if(frame.selected)outline(ctx,'#f5d38e',1.6,'#f9e1ae',1.8);else outline(ctx,'rgba(200,225,237,.61)',1.6,'rgba(230,243,248,.78)',1.4);
     ctx.strokeStyle='rgba(255,255,255,.32)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-25,14);ctx.lineTo(-25,123);ctx.stroke();ctx.restore();
   }
