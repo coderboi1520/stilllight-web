@@ -2,7 +2,7 @@ import { Container,Graphics,GraphicsContext,Sprite } from 'pixi.js';
 import type {Texture} from 'pixi.js';
 import type {GlassFrame} from '../../core/RenderFrame.ts';
 import {LiquidView} from './LiquidView.ts';
-import {makeBodyShadowTexture,makeGlowTexture,makeShineTexture} from './assets.ts';
+import {makeBodyShadowTexture,makeGlassBaseTexture,makeGlassEdgeTexture,makeGlassRimTexture,makeGlowTexture,makeShineTexture} from './assets.ts';
 
 function closedGlassContext(){
   return new GraphicsContext()
@@ -25,14 +25,6 @@ function openWallContext(){
     .lineTo(33,0);
 }
 
-function rimArcContext(side:-1|1){
-  return new GraphicsContext().moveTo(-33,0).quadraticCurveTo(0,side*9,33,0);
-}
-
-function baseArcContext(y:number,depth:number,halfWidth:number){
-  return new GraphicsContext().moveTo(-halfWidth,y).quadraticCurveTo(0,y+depth,halfWidth,y);
-}
-
 function outline(wall:string,wallWidth:number,rim:string,rimWidth:number){
   const g=new Graphics(openWallContext());
   g.stroke({color:wall,width:wallWidth});
@@ -48,19 +40,20 @@ export class GlassView{
   private clip=new Graphics(closedGlassContext()).fill(0xffffff);
   private clipped=new Container();
   private liquid=new LiquidView();
+  private baseTexture=makeGlassBaseTexture();
+  private baseDepth=new Sprite(this.baseTexture);
   private reflectionTexture=makeShineTexture();
   private reflection=new Sprite(this.reflectionTexture);
+  private edgeTexture=makeGlassEdgeTexture();
+  private edgeHighlight=new Sprite(this.edgeTexture);
+  private rimTexture=makeGlassRimTexture();
+  private normalRim=new Sprite(this.rimTexture);
   private normal=new Graphics(openWallContext()).stroke({color:'#b9d8e66f',width:1.25});
-  private backRim=new Graphics(rimArcContext(-1)).stroke({color:'#a9cadb63',width:1.05});
-  private frontRim=new Graphics(rimArcContext(1)).stroke({color:'#eaf7fab8',width:1.35});
-  private baseShade=new Graphics(baseArcContext(146,10,25)).stroke({color:'#06141b5c',width:2.2});
-  private baseHighlight=new Graphics(baseArcContext(151,5.5,17)).stroke({color:'#ddf5f968',width:1});
   private selected=outline('#f5d38e',1.6,'#f9e1ae',1.8);
   private invalid=outline('#ff8e94',3,'#ffb0b5',1.4);
-  private edgeHighlight=new Graphics().moveTo(29,24).lineTo(29,104).stroke({color:'#f2fbff66',width:1});
   private glows:{selected:Sprite;hintSource:Sprite;hintTarget:Sprite;invalid:Sprite};
   private glowList:Sprite[]=[];
-  private ownedTextures:Texture[]=[this.shadowTexture,this.reflectionTexture];
+  private ownedTextures:Texture[]=[this.shadowTexture,this.baseTexture,this.reflectionTexture,this.edgeTexture,this.rimTexture];
   private destroyed=false;
 
   constructor(){
@@ -68,9 +61,14 @@ export class GlassView{
     this.shadow.width=180;
     this.shadow.height=230;
     this.body.fill({color:'#102731',alpha:.18});
-    this.reflection.position.set(-34,0);
-    this.reflection.width=68;
-    this.reflection.height=158;
+    for(const surface of [this.baseDepth,this.reflection,this.edgeHighlight]){
+      surface.position.set(-34,0);
+      surface.width=68;
+      surface.height=158;
+    }
+    this.normalRim.position.set(-90,-36);
+    this.normalRim.width=180;
+    this.normalRim.height=230;
     const selectedTexture=makeGlowTexture('#f5d38e',2.4,16),hintSourceTexture=makeGlowTexture('#f5d38e',2.4,16),hintTargetTexture=makeGlowTexture('#83e0d4',2.4,16),invalidTexture=makeGlowTexture('#ff8e94',3,12);
     this.ownedTextures.push(selectedTexture,hintSourceTexture,hintTargetTexture,invalidTexture);
     this.glows={selected:new Sprite(selectedTexture),hintSource:new Sprite(hintSourceTexture),hintTarget:new Sprite(hintTargetTexture),invalid:new Sprite(invalidTexture)};
@@ -81,9 +79,9 @@ export class GlassView{
       g.height=230;
       g.visible=false;
     }
-    this.clipped.addChild(this.liquid.root,this.reflection);
+    this.clipped.addChild(this.liquid.root,this.baseDepth,this.reflection,this.edgeHighlight);
     this.clipped.mask=this.clip;
-    this.root.addChild(this.shadow,this.body,this.clip,this.clipped,this.baseShade,this.baseHighlight,...this.glowList,this.backRim,this.normal,this.frontRim,this.selected,this.invalid,this.edgeHighlight);
+    this.root.addChild(this.shadow,this.body,this.clip,this.clipped,...this.glowList,this.normal,this.normalRim,this.selected,this.invalid);
     this.selected.visible=this.invalid.visible=false;
   }
 
@@ -102,7 +100,9 @@ export class GlassView{
     this.reflection.x=-34+Math.max(-2,Math.min(2,-Math.sin(frame.pose.angle)*2));
     this.liquid.update(frame);
     for(const g of this.glowList)g.visible=false;
-    this.normal.visible=!frame.invalid&&!frame.selected;
+    const normalVisible=!frame.invalid&&!frame.selected;
+    this.normal.visible=normalVisible;
+    this.normalRim.visible=normalVisible;
     this.selected.visible=frame.selected&&!frame.invalid;
     this.invalid.visible=frame.invalid;
     if(frame.invalid)this.glows.invalid.visible=true;
