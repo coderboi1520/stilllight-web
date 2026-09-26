@@ -11,6 +11,7 @@ export class PixiRenderer{
   private scene=new Container();
   private glasses:[GlassView,GlassView]|null=null;
   private stream:StreamView|null=null;
+  private retiredRoots:Container[]=[];
   private initialized=false;
   private movingIndex=-2;
   private density=1;
@@ -36,9 +37,15 @@ export class PixiRenderer{
 
   private rebuildViews(force:boolean){
     if(this.glasses&&this.stream&&!force)return;
-    if(this.glasses){this.scene.removeChildren();this.glasses[0].root.destroy({children:true});this.glasses[1].root.destroy({children:true});this.stream?.root.destroy({children:true});}
+    if(this.glasses){
+      this.scene.removeChildren();
+      this.retiredRoots.push(this.glasses[0].root,this.glasses[1].root);
+      if(this.stream)this.retiredRoots.push(this.stream.root);
+    }
     this.glasses=[new GlassView(),new GlassView()];this.stream=new StreamView();this.scene.addChild(this.glasses[0].root,this.glasses[1].root,this.stream.root);this.movingIndex=-2;
   }
+
+  private destroyRetiredViews(){for(const root of this.retiredRoots)root.destroy({children:true});this.retiredRoots.length=0;}
 
   resize(width:number,height:number,density:number){
     const next=Math.max(1,Math.min(density||1,2));
@@ -57,8 +64,8 @@ export class PixiRenderer{
   render(frame:RenderFrame){
     if(!this.initialized||!this.glasses||!this.stream)return;
     this.glasses[0].update(frame.glasses[0]);this.glasses[1].update(frame.glasses[1]);
-    const movingIndex=frame.glasses[0].moving?0:frame.glasses[1].moving?1:-1;this.ensureDrawOrder(movingIndex);this.stream.update(frame.stream);this.app.renderer.render(this.app.stage);
+    const movingIndex=frame.glasses[0].moving?0:frame.glasses[1].moving?1:-1;this.ensureDrawOrder(movingIndex);this.stream.update(frame.stream);this.app.renderer.render(this.app.stage);this.destroyRetiredViews();
   }
 
-  destroy(){this.app.canvas?.removeEventListener('webglcontextrestored',this.restoreHandler);try{this.app.destroy(true,{children:true});}catch{}this.initialized=false;}
+  destroy(){this.app.canvas?.removeEventListener('webglcontextrestored',this.restoreHandler);this.destroyRetiredViews();try{this.app.destroy(true,{children:true});}catch{}this.initialized=false;}
 }
