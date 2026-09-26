@@ -46,11 +46,10 @@ body {
   top: 12px;
   left: 12px;
   z-index: 10;
-  min-width: 176px;
+  min-width: 188px;
   padding: 7px 8px;
   background: rgba(4, 12, 17, 0.56);
   border-radius: 5px;
-  pointer-events: none;
   font-size: 12px;
   line-height: 1.35;
   text-shadow: 0 1px 2px #000;
@@ -58,7 +57,7 @@ body {
 
 .live-overlay dl {
   display: grid;
-  grid-template-columns: auto minmax(58px, 1fr);
+  grid-template-columns: auto minmax(72px, 1fr);
   gap: 1px 10px;
   margin: 0;
 }
@@ -71,7 +70,20 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.live-overlay select {
+  width: 76px;
+  margin: 0;
+  padding: 0 2px;
+  border: 1px solid #38505b;
+  border-radius: 3px;
+  background: #0b1b23;
+  color: #f4fbff;
+  font: inherit;
+  text-align: right;
+}
+
 @media (max-width: 900px) {
   .benchmark-shell { width: min(100vw, calc(100vh * 760 / 620)); }
-  .live-overlay { top: 6px; left: 6px; min-width: 154px; font-size: 10px; }
+  .live-overlay { top: 6px; left: 6px; min-width: 166px; font-size: 10px; }
+  .live-overlay select { width: 68px; }
 }
