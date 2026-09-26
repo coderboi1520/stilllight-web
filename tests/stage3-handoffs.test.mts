@@ -88,3 +88,22 @@ test('handoff result depends on event timestamps rather than sampling cadence',(
   assertPoseClose(at90,at60,1e-9);
   assertPoseClose(at120,at60,1e-9);
 });
+
+test('selection starts from the displayed rest velocity instead of restarting authored lift velocity',()=>{
+  const model=new StilllightModel(),home=position(0);
+  const before={x:home.x,y:home.y,angle:0};
+  model.choose(0,T);
+  const at=poseAt(model,T),after=poseAt(model,T+EPS);
+  assertPoseClose(at,before);
+  assertVelocityClose(velocity(at,after,EPS),{x:0,y:0,angle:0});
+});
+
+test('selection interrupting hint inherits the hinted pose and velocity',()=>{
+  const model=new StilllightModel();
+  model.hint(T);
+  const event=T+100,beforePrev=poseAt(model,event-EPS),before=poseAt(model,event),beforeVelocity=velocity(beforePrev,before,EPS);
+  model.choose(0,event);
+  const at=poseAt(model,event),after=poseAt(model,event+EPS);
+  assertPoseClose(at,before);
+  assertVelocityClose(velocity(at,after,EPS),beforeVelocity);
+});
