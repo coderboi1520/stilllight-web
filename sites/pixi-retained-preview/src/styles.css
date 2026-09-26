@@ -1,0 +1,9 @@
+:root { background:#071219; color-scheme:dark; font-family:system-ui,sans-serif; }
+* { box-sizing:border-box; }
+html,body { width:100%;height:100%;margin:0;overflow:hidden;background:#071219; }
+body { display:grid;place-items:center;touch-action:manipulation;-webkit-tap-highlight-color:transparent; }
+.board { position:relative;width:min(100vw,calc(100vh * .6451612903));height:min(100vh,calc(100vw * 1.55));max-width:400px;max-height:620px;background:#071219; }
+#pixi-host,.hit-glasses,#pixi-host canvas { position:absolute;inset:0;width:100%;height:100%;display:block; }
+.hit-glasses button { position:absolute;top:20.97%;width:max(16.5%,44px);height:25.16%;border:0;border-radius:18px;background:transparent;padding:0; }
+.hit-glasses button:nth-child(1){left:calc(20% - max(8.25%,22px));}.hit-glasses button:nth-child(2){left:calc(50% - max(8.25%,22px));}
+.hit-glasses button:focus,.hit-glasses button:focus-visible{outline:none;}
