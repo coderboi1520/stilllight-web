@@ -53,15 +53,23 @@ function cumulativeSummary() {
   };
 }
 
-function renderCompletedCycle(result) {
-  completed.push(result);
-  const cumulative = cumulativeSummary();
+function renderSummary() {
+  if (!completed.length) {
+    summary.hidden = false;
+    summary.textContent = 'Waiting for first completed cycle…';
+    return;
+  }
   summary.hidden = false;
   summary.textContent = JSON.stringify({
-    latestCycle: result,
-    cumulative,
+    latestCycle: completed.at(-1),
+    cumulative: cumulativeSummary(),
   }, null, 2);
-  console.log(`STILLLIGHT_BENCHMARK_CUMULATIVE ${JSON.stringify(cumulative)}`);
+}
+
+function renderCompletedCycle(result) {
+  completed.push(result);
+  renderSummary();
+  console.log(`STILLLIGHT_BENCHMARK_CUMULATIVE ${JSON.stringify(cumulativeSummary())}`);
 }
 
 function startNextCycle() {
@@ -70,6 +78,9 @@ function startNextCycle() {
   cycle += 1;
   if (cycleNode) cycleNode.textContent = String(cycle);
   api.startBenchmark();
+  // main.js clears the per-run summary when it starts. Restore the latest
+  // cumulative report immediately so completed-cycle stats stay visible.
+  renderSummary();
 }
 
 window.addEventListener('stilllight-benchmark-complete', (event) => {
