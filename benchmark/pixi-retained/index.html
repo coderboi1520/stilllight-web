@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#071219" />
+  <title>STILLLIGHT Retained Pixi 10-Glass Uncapped Benchmark</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <!-- Reuse the exact same uncapped scheduler as the original Canvas benchmark. -->
+  <script src="../original-canvas/src/uncapped-loop.js"></script>
+</head>
+<body>
+  <aside class="live-overlay" aria-label="Live benchmark metrics">
+    <dl>
+      <dt>Backend</dt><dd>Pixi WebGL</dd>
+      <dt>Mode</dt><dd>10-glass</dd>
+      <dt>Scheduler</dt><dd>Uncapped</dd>
+      <dt>Cycle</dt><dd data-live="cycle">1</dd>
+      <dt>Elapsed</dt><dd data-live="elapsed">0.00 s</dd>
+      <dt>Current FPS</dt><dd data-live="fps">—</dd>
+      <dt>Min FPS</dt><dd data-live="min-fps">—</dd>
+      <dt>Avg FPS</dt><dd data-live="avg-fps">—</dd>
+      <dt>Max FPS</dt><dd data-live="max-fps">—</dd>
+      <dt>Frame ms</dt><dd data-live="frame-ms">—</dd>
+      <dt>Active glasses</dt><dd data-live="active-glasses">0</dd>
+      <dt>Active pours</dt><dd data-live="active-pours">0</dd>
+    </dl>
+  </aside>
+
+  <main class="benchmark-shell">
+    <section class="stage" aria-label="STILLLIGHT retained Pixi ten-glass stress benchmark">
+      <div id="pixi-benchmark-host"></div>
+    </section>
+  </main>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
