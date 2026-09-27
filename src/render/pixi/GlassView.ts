@@ -1,7 +1,7 @@
-import { Container,Graphics,GraphicsContext,Sprite } from 'pixi.js';
-import type {Texture} from 'pixi.js';
+import { Container,Graphics,GraphicsContext,Rectangle,Sprite,Texture } from 'pixi.js';
 import type {GlassFrame} from '../../core/RenderFrame.ts';
 import {COMPLETION_ACCENTS} from '../../core/constants.ts';
+import {CAP_ART_SCALE,CAP_NECK_START,CAP_NECK_X_SCALE,CAP_SOURCE_BOTTOM,CAP_SOURCE_SIZE,CAP_UPPER_END} from '../capArtwork.ts';
 import {LiquidView} from './LiquidView.ts';
 import {makeBodyShadowTexture,makeGlassBaseTexture,makeGlassEdgeTexture,makeGlassRimTexture,makeGlowTexture,makeShineTexture} from './assets.ts';
 
@@ -50,8 +50,11 @@ export class GlassView{
   private edgeHighlight=new Sprite(this.edgeTexture);
   private rimTexture=makeGlassRimTexture();
   private normalRim=new Sprite(this.rimTexture);
-  private cap=new Sprite();
-  private capScale=1;
+  private cap=new Container();
+  private capNeck=new Sprite();
+  private capBody=new Sprite();
+  private capPartTextures:Texture[]=[];
+  private frontRim=new Graphics().moveTo(-33,0).bezierCurveTo(-33,2.485,-18.225,4.5,0,4.5).bezierCurveTo(18.225,4.5,33,2.485,33,0).stroke({color:'#e6f3f8',alpha:.78,width:1.4});
   private particles:Graphics[]=[];
   private normal=new Graphics(openWallContext()).stroke({color:'#b9d8e66f',width:1.25});
   private selected=outline('#f5d38e',1.6,'#f9e1ae',1.8);
@@ -62,11 +65,18 @@ export class GlassView{
   private destroyed=false;
 
   constructor(capTexture:Texture){
-    this.cap.texture=capTexture;
-    this.cap.anchor.set(.5,1055/1254);
-    this.capScale=110/capTexture.width;
-    this.cap.scale.set(this.capScale);
+    const upper=new Texture({source:capTexture.source,frame:new Rectangle(0,0,CAP_SOURCE_SIZE,CAP_UPPER_END)});
+    const neck=new Texture({source:capTexture.source,frame:new Rectangle(0,CAP_NECK_START,CAP_SOURCE_SIZE,CAP_SOURCE_BOTTOM-CAP_NECK_START)});
+    this.capPartTextures.push(upper,neck);
+    this.capBody.texture=upper;
+    this.capBody.position.set(-CAP_SOURCE_SIZE/2,-CAP_SOURCE_BOTTOM);
+    this.capNeck.texture=neck;
+    this.capNeck.position.set(-CAP_SOURCE_SIZE*CAP_NECK_X_SCALE/2,CAP_NECK_START-CAP_SOURCE_BOTTOM);
+    this.capNeck.scale.x=CAP_NECK_X_SCALE;
+    this.cap.addChild(this.capNeck,this.capBody);
+    this.cap.scale.set(CAP_ART_SCALE);
     this.cap.visible=false;
+    this.frontRim.visible=false;
     this.shadow.position.set(-90,-36);
     this.shadow.width=180;
     this.shadow.height=230;
@@ -92,7 +102,7 @@ export class GlassView{
     this.clipped.addChild(this.liquid.root,this.baseDepth,this.reflection,this.edgeHighlight);
     this.clipped.mask=this.clip;
     for(let i=0;i<12;i++){const particle=i<8?new Graphics().circle(0,0,1.7).fill({color:0xffffff,alpha:.16}).circle(0,0,.75).fill(0xffffff):new Graphics().circle(0,0,1).stroke({color:0xffffff,width:.45});particle.visible=false;this.particles.push(particle);}
-    this.root.addChild(this.shadow,this.body,this.clip,this.clipped,...this.glowList,this.normal,this.normalRim,this.selected,this.invalid,this.cap,...this.particles);
+    this.root.addChild(this.shadow,this.body,this.clip,this.clipped,...this.glowList,this.normal,this.normalRim,this.selected,this.invalid,this.cap,this.frontRim,...this.particles);
     this.selected.visible=this.invalid.visible=false;
   }
 
@@ -101,6 +111,7 @@ export class GlassView{
     this.destroyed=true;
     this.liquid.destroy();
     this.root.destroy({children:true});
+    for(const texture of this.capPartTextures)texture.destroy(false);
     for(const texture of this.ownedTextures)texture.destroy(true);
     this.ownedTextures.length=0;
   }
@@ -109,10 +120,12 @@ export class GlassView{
     this.root.position.set(frame.pose.x,frame.pose.y+frame.completion.recoilY);
     this.root.rotation=frame.pose.angle;
     this.cap.visible=frame.cap.visible;
+    this.frontRim.visible=frame.cap.visible;
     this.cap.position.set(0,frame.cap.y);
-    this.cap.scale.set(this.capScale*frame.cap.scaleX,this.capScale*frame.cap.scaleY);
+    this.cap.scale.set(CAP_ART_SCALE*frame.cap.scaleX,CAP_ART_SCALE*frame.cap.scaleY);
     this.cap.rotation=frame.cap.rotation;
     this.cap.alpha=frame.cap.alpha;
+    this.frontRim.tint=frame.invalid?'#ffb0b5':frame.selected?'#f9e1ae':'#ffffff';
     for(let i=0;i<this.particles.length;i++){
       const particle=this.particles[i],state=frame.completion.particles[i];particle.visible=state.visible;
       if(!state.visible)continue;
