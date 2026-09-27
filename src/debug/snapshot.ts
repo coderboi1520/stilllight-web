@@ -1,2 +1,26 @@
-import type {RenderFrame} from '../core/RenderFrame.ts';
-export function snapshotFrame(frame:RenderFrame){return{now:frame.now,board:frame.board.map(g=>[...g]),glasses:frame.glasses.map(g=>({index:g.index,pose:{...g.pose},surfaceAngle:g.surfaceAngle,relativeLiquidRotation:g.relativeLiquidRotation,wave:g.wave,phase:g.phase,dynamicLiquid:g.dynamicLiquid,layers:g.layers.map(l=>({color:l.color,amount:l.amount,bottom:l.bottom,top:l.top,isTop:l.isTop,wavy:l.wavy,surface:l.surface?Array.from(l.surface):null})),selected:g.selected,hintRole:g.hintRole,invalid:g.invalid,moving:g.moving})),stream:frame.stream?{visible:frame.stream.visible,color:frame.stream.color,alpha:frame.stream.alpha,start:{...frame.stream.start},control:{...frame.stream.control},end:{...frame.stream.end},impact:frame.stream.impact}:null,metrics:{...frame.metrics},events:[...frame.events]};}
+import type {RenderFrame,SurfaceContact} from '../core/RenderFrame.ts';
+
+const snapshotContact=(contact:SurfaceContact)=>({local:{...contact.local},world:{...contact.world},tangent:{...contact.tangent},empty:contact.empty});
+
+export function snapshotFrame(frame:RenderFrame){
+  return{
+    now:frame.now,
+    board:frame.board.map(glass=>[...glass]),
+    glasses:frame.glasses.map(glass=>({
+      index:glass.index,pose:{...glass.pose},surfaceAngle:glass.surfaceAngle,
+      relativeLiquidRotation:glass.relativeLiquidRotation,wave:glass.wave,phase:glass.phase,
+      dynamicLiquid:glass.dynamicLiquid,
+      layers:glass.layers.map(layer=>({color:layer.color,amount:layer.amount,bottom:layer.bottom,top:layer.top,isTop:layer.isTop,wavy:layer.wavy,surface:layer.surface?Array.from(layer.surface):null})),
+      contact:snapshotContact(glass.contact),
+      response:glass.response?{contact:snapshotContact(glass.response.contact),intensity:glass.response.intensity,spread:glass.response.spread}:null,
+      selected:glass.selected,hintRole:glass.hintRole,hintStrength:glass.hintStrength,
+      invalid:glass.invalid,invalidStrength:glass.invalidStrength,moving:glass.moving
+    })),
+    stream:frame.stream?{
+      visible:frame.stream.visible,color:frame.stream.color,alpha:frame.stream.alpha,
+      reveal:frame.stream.reveal,widthScale:frame.stream.widthScale,
+      start:{...frame.stream.start},control:{...frame.stream.control},end:{...frame.stream.end}
+    }:null,
+    metrics:{...frame.metrics},events:[...frame.events]
+  };
+}

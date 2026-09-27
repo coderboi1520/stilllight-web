@@ -105,6 +105,9 @@ export class GlassView{
     this.normalRim.visible=normalVisible;
     this.selected.visible=frame.selected&&!frame.invalid;
     this.invalid.visible=frame.invalid;
+    this.invalid.alpha=.65*frame.invalidStrength;
+    this.glows.invalid.alpha=.55*frame.invalidStrength;
+    this.glows.hintSource.alpha=this.glows.hintTarget.alpha=frame.hintStrength;
     if(frame.invalid)this.glows.invalid.visible=true;
     else if(frame.hintRole==='source')this.glows.hintSource.visible=true;
     else if(frame.hintRole==='target')this.glows.hintTarget.visible=true;

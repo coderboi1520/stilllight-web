@@ -13,7 +13,7 @@ test('authored durations are pinned independently of candidate timing math',()=>
 
 test('moving source suppresses hint emphasis while target hint remains valid',()=>{const m=new StilllightModel();m.hint(T);assert.equal(m.startPour(T+100),true);const frame=m.sample(T+150);assert.equal(frame.glasses[0].moving,true);assert.equal(frame.glasses[0].hintRole,null);assert.equal(frame.glasses[1].hintRole,'target');});
 
-test('selection then hint then pour also suppresses moving-source hint',()=>{const m=new StilllightModel();m.choose(0,T);m.hint(T+10);m.choose(1,T+20);const frame=m.sample(T+70);assert.equal(frame.glasses[0].moving,true);assert.equal(frame.glasses[0].hintRole,null);assert.equal(frame.glasses[1].hintRole,'target');});
+test('selection then hint then pour also suppresses moving-source hint after the target delay',()=>{const m=new StilllightModel();m.choose(0,T);m.hint(T+10);m.choose(1,T+20);const frame=m.sample(T+110);assert.equal(frame.glasses[0].moving,true);assert.equal(frame.glasses[0].hintRole,null);assert.equal(frame.glasses[1].hintRole,'target');});
 
 test('selection then hint then reverse pour suppresses moving-target hint',()=>{const m=new StilllightModel();m.choose(1,T);m.hint(T+10);m.choose(0,T+20);const frame=m.sample(T+70);assert.equal(frame.glasses[1].moving,true);assert.equal(frame.glasses[1].hintRole,null);assert.equal(frame.glasses[0].hintRole,'source');});
 
@@ -43,8 +43,8 @@ test('Canvas composes each glass once, shines inside its unrotated clip, and use
   try{
     const renderer=new CanvasRenderer(),model=new StilllightModel();model.startPour(T);const frame=model.sample(T+500);renderer.render(frame);
     const body=calls.filter(c=>c.kind==='fill'&&c.style==='rgba(12,31,42,.78)');assert.equal(body.length,2);assert.ok(body.every(c=>c.shadow==='#000'&&c.blur===7));
-    const firstBody=calls.findIndex(c=>c.kind==='fill'&&c.style==='rgba(12,31,42,.78)'),firstClip=calls.findIndex(c=>c.kind==='clip'),firstShine=calls.findIndex(c=>c.kind==='fillRect'&&c.style?.stops),firstWall=calls.findIndex(c=>c.kind==='stroke'&&c.width===1.6);assert.ok(firstBody<firstClip&&firstClip<firstShine&&firstShine<firstWall);
-    const shines=calls.filter(c=>c.kind==='fillRect'&&c.style?.stops);assert.equal(shines.length,2);
+    const firstBody=calls.findIndex(c=>c.kind==='fill'&&c.style==='rgba(12,31,42,.78)'),firstClip=calls.findIndex(c=>c.kind==='clip'),firstShine=calls.findIndex(c=>c.kind==='fillRect'&&c.style?.args?.[0]===-34),firstWall=calls.findIndex(c=>c.kind==='stroke'&&c.width===1.6);assert.ok(firstBody<firstClip&&firstClip<firstShine&&firstShine<firstWall);
+    const shines=calls.filter(c=>c.kind==='fillRect'&&c.style?.args?.[0]===-34);assert.equal(shines.length,2);
     for(const shine of shines){assert.deepEqual([shine.x,shine.y,shine.w,shine.h],[-34,0,68,158]);assert.equal(shine.clipped,true);assert.deepEqual(shine.style.args,[-34,0,34,0]);assert.deepEqual(shine.style.stops,[[0,'#ffffff38'],[.18,'#ffffff07'],[.86,'#ffffff00'],[1,'#ffffff34']]);}
     assert.equal(shines[0].rotation,frame.glasses[1].pose.angle);assert.equal(shines[1].rotation,frame.glasses[0].pose.angle);
     calls.length=0;model.reset();model.invalid(T+1000);renderer.render(model.sample(T+1100));

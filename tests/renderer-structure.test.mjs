@@ -20,16 +20,17 @@ test('glass wall and glow paths stay open while fill/mask paths stay closed',()=
   assert.match(assets,/drawOpenWallPath\(ctx\);\s*ctx\.stroke\(\);\s*drawRim/);
 });
 
-test('stream is retained, Canvas-profile halo follows stream fade, and impact alpha remains separate',()=>{
+test('stream uses retained tapered strips, a half-strength halo, and authored reveal',()=>{
   const stream=read('../src/render/pixi/StreamView.ts');
   const assets=read('../src/render/pixi/assets.ts');
   assert.doesNotMatch(stream,/\.clear\(\)/);
   assert.match(stream,/makeStreamHaloTexture\(\)/);
-  assert.match(stream,/makeStreamHaloCapTexture\(\)/);
-  assert.match(stream,/this\.halo\.update\(this\.center,this\.normals,color,stream\.alpha\)/);
+  assert.doesNotMatch(stream,/startCap|endCap|makeStreamHaloCapTexture/);
+  assert.match(stream,/this\.halo\.update\(this\.center,this\.normals,color,stream\.alpha\*\.46,stream\.widthScale\)/);
   assert.match(assets,/ctx\.shadowBlur=STREAM_BLUR/);
   assert.match(assets,/globalCompositeOperation='destination-out'/);
-  assert.match(stream,/this\.mesh\.alpha=\.24\*impact/);
+  assert.match(stream,/colorWidth\(t\)/);
+  assert.match(stream,/stream\.reveal\*i\/CURVE_SEGMENTS/);
   assert.match(stream,/mt\*mt\*sx\+2\*mt\*t\*cx\+t\*t\*ex/);
 });
 
@@ -38,9 +39,11 @@ test('DPR-sensitive glow bake and wave highlight normal coverage stay retained',
   const liquid=read('../src/render/pixi/LiquidView.ts');
   assert.match(assets,/cappedDensity\(\)/);
   assert.match(assets,/makeGlowTexture[\s\S]*cappedDensity\(\)/);
-  assert.match(liquid,/const tx=layer\.surface\[n\]-layer\.surface\[p\],ty=layer\.surface\[n\+1\]-layer\.surface\[p\+1\]/);
-  assert.match(liquid,/const ox=-ty\/length\*\.725,oy=tx\/length\*\.725/);
-  assert.doesNotMatch(liquid,/this\.lineVertices\[o\+1\]=y-\.725/);
+  assert.match(assets,/makeLiquidDepthTexture/);
+  assert.match(liquid,/const tx=samples\[n\]-samples\[p\],ty=samples\[n\+1\]-samples\[p\+1\]/);
+  assert.match(liquid,/const ox=-ty\/length\*\.6,oy=tx\/length\*\.6/);
+  assert.match(liquid,/this\.waveFill\.geometry\.getBuffer\('aUV'\)\.update\(\)/);
+  assert.match(liquid,/this\.flatFill\.geometry\.getBuffer\('aUV'\)\.update\(\)/);
 });
 
 test('render hot path does not re-add scene children every frame',()=>{
@@ -72,11 +75,11 @@ test('DPR view generations retire after replacement render and release private P
   assert.match(glass,/private ownedTextures:Texture\[\]/);
   assert.match(glass,/this\.liquid\.destroy\(\)/);
   assert.match(glass,/for\(const texture of this\.ownedTextures\)texture\.destroy\(true\)/);
-  assert.match(liquid,/fillGeometry\.destroy\(true\);lineGeometry\.destroy\(true\)/);
+  assert.match(liquid,/flatGeometry\.destroy\(true\);fillGeometry\.destroy\(true\);lineGeometry\.destroy\(true\)/);
+  assert.match(liquid,/this\.depthTexture\.destroy\(true\)/);
   assert.match(stream,/private haloTexture=makeStreamHaloTexture\(\)/);
-  assert.match(stream,/private haloCapTexture=makeStreamHaloCapTexture\(\)/);
   assert.match(stream,/geometry\.destroy\(true\)/);
-  assert.match(stream,/this\.haloTexture\.destroy\(true\);this\.haloCapTexture\.destroy\(true\)/);
+  assert.match(stream,/this\.haloTexture\.destroy\(true\)/);
 });
 
 test('viewport controller explicitly watches DPR-only changes without RAF polling',()=>{
@@ -95,15 +98,16 @@ test('idle RAF harness resets startup requests before measuring settled idle',()
   assert.match(settled,/__rafProbe\.reset\(\)/);
 });
 
-test('explicit Canvas fallback covers liquid, transform, stream and impact primitives',()=>{
+test('explicit Canvas fallback covers depth, transform, stream and local response primitives',()=>{
   const stage=read('../src/render/StageRenderer.ts');
   const canvas=read('../src/render/CanvasRenderer.ts');
   assert.match(stage,/selectBackend\(hasWebGL\)/);
   assert.match(stage,/new CanvasRenderer\(\)/);
   assert.match(canvas,/ctx\.rotate\(frame\.pose\.angle\)/);
   assert.match(canvas,/layer\.wavy&&layer\.surface/);
-  assert.match(canvas,/quadraticCurveTo\(stream\.control\.x,stream\.control\.y,stream\.end\.x,stream\.end\.y\)/);
-  assert.match(canvas,/ctx\.lineCap='round'/);
-  assert.match(canvas,/ctx\.ellipse\(stream\.end\.x,stream\.end\.y\+1\.5/);
+  assert.match(canvas,/createLinearGradient\(0,0,0,GLASS_BOTTOM\)/);
+  assert.match(canvas,/quadraticCurveTo\(controlX,controlY,endX,endY\)/);
+  assert.match(canvas,/ctx\.lineCap='butt'/);
+  assert.match(canvas,/ctx\.ellipse\(0,\.6,frame\.response\.spread/);
   assert.match(canvas,/frame\.hintRole==='source'/);
 });

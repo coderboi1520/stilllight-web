@@ -54,6 +54,17 @@ function rawCanvasTexture(canvas:HTMLCanvasElement){
   return texture;
 }
 
+export function makeLiquidDepthTexture(){
+  const canvas=document.createElement('canvas');
+  canvas.width=2;canvas.height=316;
+  const ctx=canvas.getContext('2d')!;
+  const depth=ctx.createLinearGradient(0,0,0,316);
+  depth.addColorStop(0,'#ffffff');
+  depth.addColorStop(1,'#dedede');
+  ctx.fillStyle=depth;ctx.fillRect(0,0,2,316);
+  return rawCanvasTexture(canvas);
+}
+
 function glassSurfaceTexture(draw:(ctx:CanvasRenderingContext2D)=>void){
   const canvas=document.createElement('canvas');
   canvas.width=136;
@@ -62,20 +73,6 @@ function glassSurfaceTexture(draw:(ctx:CanvasRenderingContext2D)=>void){
   ctx.scale(2,2);
   draw(ctx);
   return rawCanvasTexture(canvas);
-}
-
-let circleTexture:Texture|null=null;
-export function getCircleTexture(){
-  if(circleTexture)return circleTexture;
-  const size=64,canvas=document.createElement('canvas');
-  canvas.width=canvas.height=size;
-  const ctx=canvas.getContext('2d')!;
-  ctx.beginPath();
-  ctx.arc(size/2,size/2,size/2,0,Math.PI*2);
-  ctx.fillStyle='#fff';
-  ctx.fill();
-  circleTexture=rawCanvasTexture(canvas);
-  return circleTexture;
 }
 
 export function makeBodyShadowTexture(){
@@ -168,7 +165,7 @@ export function makeGlassEdgeTexture(){
 }
 
 const STREAM_HALO_SPAN=40;
-const STREAM_WIDTH=5.8;
+const STREAM_WIDTH=4.2;
 const STREAM_BLUR=10;
 
 function drawStreamShadowOnly(ctx:CanvasRenderingContext2D,drawCore:()=>void){
@@ -206,21 +203,6 @@ export function makeStreamHaloTexture(){
   canvas.height=workSize;
   const ctx=canvas.getContext('2d')!;
   ctx.drawImage(work,Math.floor((workSize-slice)*.5),0,slice,workSize,0,0,canvas.width,canvas.height);
-  return rawCanvasTexture(canvas);
-}
-
-export function makeStreamHaloCapTexture(){
-  const density=cappedDensity();
-  const canvas=document.createElement('canvas');
-  const size=Math.max(1,Math.round(STREAM_HALO_SPAN*density));
-  canvas.width=canvas.height=size;
-  const ctx=canvas.getContext('2d')!;
-  ctx.scale(density,density);
-  drawStreamShadowOnly(ctx,()=>{
-    ctx.beginPath();
-    ctx.arc(STREAM_HALO_SPAN*.5,STREAM_HALO_SPAN*.5,STREAM_WIDTH*.5,0,Math.PI*2);
-    ctx.fill();
-  });
   return rawCanvasTexture(canvas);
 }
 
