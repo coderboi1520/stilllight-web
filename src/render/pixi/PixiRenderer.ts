@@ -1,6 +1,6 @@
 import { Application,Assets,Container } from 'pixi.js';
 import type {Texture} from 'pixi.js';
-import { H,W } from '../../core/constants.ts';
+import { H,SCENE_TOP_PADDING,W } from '../../core/constants.ts';
 import type {RenderFrame} from '../../core/RenderFrame.ts';
 import {GlassView} from './GlassView.ts';
 import {StreamView} from './StreamView.ts';
@@ -60,6 +60,7 @@ export class PixiRenderer{
     if(Math.abs(next-this.density)>1e-6){this.density=next;configureAssetDensity(next);this.rebuildViews(true);}
     this.app.renderer.resize(Math.max(1,width),Math.max(1,height),next);
     this.scene.scale.set(width/W,height/H);
+    this.scene.y=SCENE_TOP_PADDING*height/H;
   }
 
   private ensureDrawOrder(movingIndex:number){

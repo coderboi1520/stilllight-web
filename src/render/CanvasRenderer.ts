@@ -1,4 +1,4 @@
-import { COLORS,COMPLETION_ACCENTS,GLASS_BOTTOM,H,W } from '../core/constants.ts';
+import { COLORS,COMPLETION_ACCENTS,GLASS_BOTTOM,H,SCENE_TOP_PADDING,W } from '../core/constants.ts';
 import type {GlassFrame,LiquidLayerFrame,RenderFrame,StreamFrame} from '../core/RenderFrame.ts';
 import {CAP_ART_SCALE,CAP_ART_WIDTH,CAP_NECK_START,CAP_NECK_X_SCALE,CAP_SOURCE_BOTTOM,CAP_SOURCE_SIZE,CAP_UPPER_END} from './capArtwork.ts';
 
@@ -62,7 +62,7 @@ export class CanvasRenderer{
   }
 
   render(frame:RenderFrame){
-    const ctx=this.ctx,sx=this.width/W,sy=this.height/H;ctx.setTransform(this.density,0,0,this.density,0,0);ctx.clearRect(0,0,this.width,this.height);ctx.fillStyle='#071219';ctx.fillRect(0,0,this.width,this.height);ctx.setTransform(this.density*sx,0,0,this.density*sy,0,0);
+    const ctx=this.ctx,sx=this.width/W,sy=this.height/H;ctx.setTransform(this.density,0,0,this.density,0,0);ctx.clearRect(0,0,this.width,this.height);ctx.fillStyle='#071219';ctx.fillRect(0,0,this.width,this.height);ctx.setTransform(this.density*sx,0,0,this.density*sy,0,0);ctx.translate(0,SCENE_TOP_PADDING);
     const moving=frame.glasses[0].moving?0:frame.glasses[1].moving?1:-1;if(moving===0){this.glass(frame.glasses[1]);this.glass(frame.glasses[0]);}else{this.glass(frame.glasses[0]);this.glass(frame.glasses[1]);}this.stream(frame.stream);
   }
 }

@@ -1,4 +1,4 @@
-export const W=400, H=620, EDGE_MARGIN=8, GLASS_HALF_WIDTH=33, GLASS_HEIGHT=156, SELECT_LIFT=10;
+export const W=400, H=620, EDGE_MARGIN=8, GLASS_HALF_WIDTH=33, GLASS_HEIGHT=156, SELECT_LIFT=10, SCENE_TOP_PADDING=20;
 export const CAPACITY=4;
 export const COLORS=['#efb94e','#ef777d','#42cbbd','#a28aeb'] as const;
 export const COMPLETION_ACCENTS=['#fff0bd','#ffe3e5','#c6fff5','#e7dcff'] as const;
