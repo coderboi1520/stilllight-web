@@ -34,7 +34,7 @@ export class PixiRenderer{
     // scheduler otherwise keeps Ticker.system alive solely for periodic GC.
     this.app.renderer.gc.enabled=false;
     this.app.renderer.scheduler.destroy();
-    this.capTexture=await Assets.load<Texture>('/assets/chicken-cap.png');
+    this.capTexture=await Assets.load<Texture>('/assets/pumpkin-cap.png');
     host.appendChild(this.app.canvas);
     this.app.stage.addChild(this.scene);
     this.rebuildViews(false);
@@ -49,7 +49,7 @@ export class PixiRenderer{
       this.retiredViews.push(this.glasses[0],this.glasses[1]);
       if(this.stream)this.retiredViews.push(this.stream);
     }
-    if(!this.capTexture)throw new Error('Chicken cap texture unavailable');
+    if(!this.capTexture)throw new Error('Pumpkin cap texture unavailable');
     this.glasses=[new GlassView(this.capTexture),new GlassView(this.capTexture)];this.stream=new StreamView();this.scene.addChild(this.glasses[0].root,this.glasses[1].root,this.stream.root);this.movingIndex=-2;
   }
 

@@ -73,7 +73,7 @@ test('dev completed-right preview uses canonical board and the real landing tran
   const drop=at(model,T+100),contact=at(model,T+310),rebound=at(model,T+394),rest=at(model,T+550);
   assert.equal(drop.visible,true);assert.equal(drop.alpha,1);assert.ok(drop.y<rest.y-40);
   assert.equal(contact.y,rest.y);assert.ok(rebound.y<rest.y-5);
-  assert.deepEqual(rest,{visible:true,alpha:1,y:9,scaleX:1,scaleY:1,rotation:0});
+  assert.deepEqual(rest,{visible:true,alpha:1,y:16,scaleX:1,scaleY:1,rotation:0});
   model.reset();
   assert.deepEqual(model.board,[[2,0,3],[3]]);
   assert.equal(at(model,T+351).visible,false);
@@ -85,7 +85,7 @@ test('first contact synchronizes bounded bottle recoil, area-preserving liquid w
   assert.equal(before.completion.recoilY,0);
   assert.equal(before.completion.particles.some(p=>p.visible),false);
   const impact=model.sample(T+210).glasses[1];
-  assert.equal(impact.cap.y,9);
+  assert.equal(impact.cap.y,16);
   assert.equal(impact.completion.particles.filter(p=>p.visible).length,12);
   model.advanceAfterFrame(T+210);model.advanceAfterFrame(T+220);
   assert.equal(model.events.filter(e=>e==='cap-contact:1').length,1);
@@ -126,14 +126,14 @@ test('dev preview leaves subsequent pour and Undo history valid',()=>{
   assert.equal(at(model,end+100+UNDO_MS,1).visible,true);
 });
 
-test('renderers retain upper and lower cap art under one glass-local rigid body',()=>{
+test('renderers retain a glass-local pumpkin cap under one rigid body',()=>{
   const glass=fs.readFileSync(new URL('../src/render/pixi/GlassView.ts',import.meta.url),'utf8');
   const pixi=fs.readFileSync(new URL('../src/render/pixi/PixiRenderer.ts',import.meta.url),'utf8');
   const canvas=fs.readFileSync(new URL('../src/render/CanvasRenderer.ts',import.meta.url),'utf8');
   assert.match(glass,/private cap=new Container/);
-  assert.match(glass,/this\.cap\.addChild\(this\.capNeck,this\.capBody\)/);
+  assert.match(glass,/this\.cap\.addChild\(this\.capBody\)/);
   assert.match(glass,/this\.root\.addChild\([^;]*this\.cap/);
   assert.doesNotMatch(glass.slice(glass.indexOf('  update(frame:GlassFrame)')),/new Sprite/);
-  assert.match(pixi,/chicken-cap\.png/);
-  assert.match(canvas,/chicken-cap\.png/);
+  assert.match(pixi,/pumpkin-cap\.png/);
+  assert.match(canvas,/pumpkin-cap\.png/);
 });

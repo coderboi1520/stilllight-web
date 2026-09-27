@@ -1,6 +1,6 @@
 import { COLORS,COMPLETION_ACCENTS,GLASS_BOTTOM,H,SCENE_TOP_PADDING,W } from '../core/constants.ts';
 import type {GlassFrame,LiquidLayerFrame,RenderFrame,StreamFrame} from '../core/RenderFrame.ts';
-import {CAP_ART_SCALE,CAP_ART_WIDTH,CAP_NECK_START,CAP_NECK_X_SCALE,CAP_SOURCE_BOTTOM,CAP_SOURCE_SIZE,CAP_UPPER_END} from './capArtwork.ts';
+import {CAP_ART_SCALE,CAP_ART_WIDTH,CAP_SOURCE_BOTTOM} from './capArtwork.ts';
 
 const DEPTH_COLORS=COLORS.map(color=>`#${[1,3,5].map(at=>Math.round(parseInt(color.slice(at,at+2),16)*.87).toString(16).padStart(2,'0')).join('')}`);
 
@@ -17,7 +17,7 @@ export class CanvasRenderer{
   private density=1;
   private capImage:HTMLImageElement|null=null;
 
-  async init(host:HTMLElement){this.capImage=new Image();this.capImage.src='/assets/chicken-cap.png';await this.capImage.decode();this.canvas.setAttribute('aria-hidden','true');host.appendChild(this.canvas);}
+  async init(host:HTMLElement){this.capImage=new Image();this.capImage.src='/assets/pumpkin-cap.png';await this.capImage.decode();this.canvas.setAttribute('aria-hidden','true');host.appendChild(this.canvas);}
   resize(width:number,height:number,density:number){this.width=Math.max(1,width);this.height=Math.max(1,height);this.density=Math.max(1,Math.min(density,2));this.canvas.width=Math.max(1,Math.round(this.width*this.density));this.canvas.height=Math.max(1,Math.round(this.height*this.density));this.canvas.style.width=`${this.width}px`;this.canvas.style.height=`${this.height}px`;}
   destroy(){this.canvas.remove();}
 
@@ -45,10 +45,8 @@ export class CanvasRenderer{
     if(frame.invalid){ctx.save();ctx.globalAlpha=.65*frame.invalidStrength;outline(ctx,'#ff8e94',3,'#ffb0b5',1.4);ctx.restore();}else if(frame.selected)outline(ctx,'#f5d38e',1.6,'#f9e1ae',1.8);else outline(ctx,'rgba(200,225,237,.61)',1.6,'rgba(230,243,248,.78)',1.4);
     ctx.strokeStyle='rgba(255,255,255,.32)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-25,14);ctx.lineTo(-25,123);ctx.stroke();
     if(frame.cap.visible&&this.capImage){ctx.save();ctx.translate(0,frame.cap.y);ctx.rotate(frame.cap.rotation);ctx.scale(frame.cap.scaleX,frame.cap.scaleY);ctx.globalAlpha=frame.cap.alpha;
-      ctx.drawImage(this.capImage,0,CAP_NECK_START,CAP_SOURCE_SIZE,CAP_SOURCE_BOTTOM-CAP_NECK_START,-CAP_ART_WIDTH*CAP_NECK_X_SCALE/2,(CAP_NECK_START-CAP_SOURCE_BOTTOM)*CAP_ART_SCALE,CAP_ART_WIDTH*CAP_NECK_X_SCALE,(CAP_SOURCE_BOTTOM-CAP_NECK_START)*CAP_ART_SCALE);
-      ctx.drawImage(this.capImage,0,0,CAP_SOURCE_SIZE,CAP_UPPER_END,-CAP_ART_WIDTH/2,-CAP_SOURCE_BOTTOM*CAP_ART_SCALE,CAP_ART_WIDTH,CAP_UPPER_END*CAP_ART_SCALE);
-      ctx.restore();
-      ctx.beginPath();ctx.moveTo(-33,0);ctx.bezierCurveTo(-33,2.485,-18.225,4.5,0,4.5);ctx.bezierCurveTo(18.225,4.5,33,2.485,33,0);ctx.strokeStyle=frame.invalid?'#ffb0b5':frame.selected?'#f9e1ae':'rgba(230,243,248,.78)';ctx.lineWidth=1.4;ctx.stroke();}
+      ctx.drawImage(this.capImage,-CAP_ART_WIDTH/2,-CAP_SOURCE_BOTTOM*CAP_ART_SCALE,CAP_ART_WIDTH,CAP_ART_WIDTH);
+      ctx.restore();}
     for(const p of frame.completion.particles){if(!p.visible)continue;ctx.save();ctx.beginPath();ctx.arc(p.x,p.y,p.radius,0,Math.PI*2);if(p.bubble){ctx.globalAlpha=p.alpha;ctx.strokeStyle='#e9f7ff';ctx.lineWidth=.8;ctx.stroke();}else{ctx.fillStyle=COMPLETION_ACCENTS[frame.completion.color];ctx.globalAlpha=p.alpha*.16;ctx.beginPath();ctx.arc(p.x,p.y,p.radius*1.7,0,Math.PI*2);ctx.fill();ctx.globalAlpha=p.alpha;ctx.beginPath();ctx.arc(p.x,p.y,p.radius*.75,0,Math.PI*2);ctx.fill();}ctx.restore();}
     ctx.restore();
   }
