@@ -48,6 +48,17 @@ test('liquid layer meshes terminate at canonical internal boundaries without pre
   assert.match(liquid,/const bottom=layer\.bottom,top=layer\.top/);
 });
 
+test('same-color adjacent liquid units merge visually while different-color boundaries remain available',()=>{
+  const liquid=read('../src/render/pixi/LiquidView.ts');
+  const canvas=read('../src/render/CanvasRenderer.ts');
+  assert.match(liquid,/update\(layer:LiquidLayerFrame,showBoundary=true\)/);
+  assert.match(liquid,/this\.line\.visible=layer\.isTop\|\|showBoundary/);
+  assert.match(liquid,/next=frame\.layers\[i\+1\];this\.layers\[i\]\.update\(layer,!next\|\|next\.color!==layer\.color\)/);
+  assert.match(canvas,/private layer\(ctx:CanvasRenderingContext2D,layer:LiquidLayerFrame,showBoundary=true\)/);
+  assert.match(canvas,/if\(layer\.isTop\|\|showBoundary\)/);
+  assert.match(canvas,/next=frame\.layers\[i\+1\];this\.layer\(ctx,layer,!next\|\|next\.color!==layer\.color\)/);
+});
+
 test('stream uses retained tapered strips, reduced halo/core, and authored reveal',()=>{
   const stream=read('../src/render/pixi/StreamView.ts');
   const assets=read('../src/render/pixi/assets.ts');
