@@ -4,20 +4,28 @@ import fs from 'node:fs';
 
 const read=rel=>fs.readFileSync(new URL(rel,import.meta.url),'utf8');
 
-test('glass wall and glow paths stay open while fill/mask paths stay closed',()=>{
+test('glass wall/glow stay open while body, mask and shadow close on the curved front-rim boundary',()=>{
   const glass=read('../src/render/pixi/GlassView.ts');
   const assets=read('../src/render/pixi/assets.ts');
   const openContext=glass.slice(glass.indexOf('function openWallContext'),glass.indexOf('function outline'));
-  const closedContext=glass.slice(glass.indexOf('function closedGlassContext'),glass.indexOf('function openWallContext'));
+  const interiorContext=glass.slice(glass.indexOf('function interiorGlassContext'),glass.indexOf('function openWallContext'));
   const openGlow=assets.slice(assets.indexOf('function drawOpenWallPath'),assets.indexOf('function drawRim'));
-  const closedGlow=assets.slice(assets.indexOf('function drawClosedGlassPath'),assets.indexOf('function drawOpenWallPath'));
+  const interiorShadow=assets.slice(assets.indexOf('function drawInteriorGlassPath'),assets.indexOf('function drawOpenWallPath'));
   assert.doesNotMatch(openContext,/closePath/);
-  assert.match(closedContext,/closePath/);
+  assert.match(interiorContext,/closePath/);
   assert.doesNotMatch(openGlow,/closePath/);
-  assert.match(closedGlow,/closePath/);
-  assert.match(glass,/new Graphics\(openWallContext\(\)\)/);
-  assert.match(glass,/new Graphics\(closedGlassContext\(\)\)/);
+  assert.match(interiorShadow,/closePath/);
+  for(const text of [interiorContext,interiorShadow]){
+    assert.match(text,/bezierCurveTo\(-33,2\.485,-18\.225,4\.5,0,4\.5\)/);
+    assert.match(text,/bezierCurveTo\(18\.225,4\.5,33,2\.485,33,0\)/);
+  }
+  assert.match(glass,/private body=new Graphics\(interiorGlassContext\(\)\)/);
+  assert.match(glass,/private clip=new Graphics\(interiorGlassContext\(\)\)\.fill\(0xffffff\)/);
   assert.match(assets,/drawOpenWallPath\(ctx\);\s*ctx\.stroke\(\);\s*drawRim/);
+  const shadow=assets.slice(assets.indexOf('export function makeBodyShadowTexture'),assets.indexOf('export function makeGlowTexture'));
+  assert.match(shadow,/drawInteriorGlassPath\(ctx\);\s*ctx\.fill\(\)/);
+  assert.doesNotMatch(glass,/closedGlassContext/);
+  assert.doesNotMatch(assets,/drawClosedGlassPath/);
 });
 
 test('Pixi glass material stays behind the curved front rim in a retained local mask',()=>{
@@ -31,6 +39,13 @@ test('Pixi glass material stays behind the curved front rim in a retained local 
   assert.match(glass,/this\.clipped\.mask=this\.clip/);
   assert.ok(glass.indexOf('this.clipped,...this.glowList,this.normal,this.normalRim')>0);
   assert.doesNotMatch(update,/new Graphics|new Sprite|makeGlass.*Texture/);
+});
+
+test('liquid layer meshes terminate at canonical internal boundaries without presentation overdraw',()=>{
+  const liquid=read('../src/render/pixi/LiquidView.ts');
+  assert.doesNotMatch(liquid,/layer\.bottom\s*\+\s*[12]/);
+  assert.match(liquid,/const bottom=layer\.bottom,bottomV=clampDepth\(bottom\),samples=layer\.surface/);
+  assert.match(liquid,/const bottom=layer\.bottom,top=layer\.top/);
 });
 
 test('stream uses retained tapered strips, reduced halo/core, and authored reveal',()=>{

@@ -10,3 +10,63 @@ const BASE_POLY=vesselPolygon(0,SCRATCH_A),BASE_AREA=polygonArea(BASE_POLY,10);
 export function canonicalArea(units:number){if(units<=0)return 0;const c=Math.min(CAPACITY,units),whole=Math.floor(c),fraction=c-whole;return CANONICAL_AREAS[whole]+(CANONICAL_AREAS[Math.min(CAPACITY,whole+1)]-CANONICAL_AREAS[whole])*fraction;}
 export function liquidLevel(units:number,relativeAngle:number){const poly=vesselPolygon(relativeAngle,SCRATCH_A);let minY=Infinity,maxY=-Infinity;for(let i=0;i<10;i++){const y=poly[i*2+1];if(y<minY)minY=y;if(y>maxY)maxY=y;}if(units<=0)return maxY;const target=Math.min(BASE_AREA,canonicalArea(units));let low=minY,high=maxY;for(let i=0;i<21;i++){const mid=(low+high)/2;if(belowArea(poly,mid)>target)low=mid;else high=mid;}return(low+high)/2;}
 export function sampleSurface(top:number,wave:number,phase:number,out:Float64Array=new Float64Array(SURFACE_SAMPLES*2)){for(let i=0;i<=SURFACE_SEGMENTS;i++){const x=SURFACE_MIN_X+(SURFACE_MAX_X-SURFACE_MIN_X)*i/SURFACE_SEGMENTS;out[i*2]=x;out[i*2+1]=top+Math.sin(x/17+phase)*wave;}return out;}
+
+
+const SURFACE_STEP=(SURFACE_MAX_X-SURFACE_MIN_X)/SURFACE_SEGMENTS;
+const BOTTOM_PROFILE=new Float64Array([-GLASS_HALF_WIDTH,130,-30,143,-22,151,-12,GLASS_BOTTOM,12,GLASS_BOTTOM,22,151,30,143,GLASS_HALF_WIDTH,130]);
+const AREA_BREAKS=(()=>{
+  const values=[-GLASS_HALF_WIDTH,-30,-22,-12,12,22,30,GLASS_HALF_WIDTH];
+  for(let i=0;i<SURFACE_SAMPLES;i++){
+    const x=SURFACE_MIN_X+SURFACE_STEP*i;
+    if(x>-GLASS_HALF_WIDTH&&x<GLASS_HALF_WIDTH)values.push(x);
+  }
+  values.sort((a,b)=>a-b);
+  return values.filter((value,index)=>index===0||Math.abs(value-values[index-1])>1e-9);
+})();
+function bottomAt(x:number){
+  for(let i=0;i<BOTTOM_PROFILE.length/2-1;i++){
+    const ax=BOTTOM_PROFILE[i*2],ay=BOTTOM_PROFILE[i*2+1],bx=BOTTOM_PROFILE[i*2+2],by=BOTTOM_PROFILE[i*2+3];
+    if(x>=ax&&x<=bx){const t=(x-ax)/(bx-ax);return ay+(by-ay)*t;}
+  }
+  return 130;
+}
+function sampledHeightAt(samples:Float64Array,x:number){
+  const left=Math.max(0,Math.min(SURFACE_SAMPLES-2,Math.floor((x-SURFACE_MIN_X)/SURFACE_STEP)));
+  const a=left*2,b=a+2,t=(x-samples[a])/(samples[b]-samples[a]);
+  return samples[a+1]+(samples[b+1]-samples[a+1])*t;
+}
+function positiveLinearArea(h0:number,h1:number,width:number){
+  if(h0<=0&&h1<=0)return 0;
+  if(h0>=0&&h1>=0)return(h0+h1)*width*.5;
+  if(h0>0){const span=width*h0/(h0-h1);return h0*span*.5;}
+  const span=width*h1/(h1-h0);return h1*span*.5;
+}
+function sampledSurfaceArea(samples:Float64Array,offset:number){
+  let area=0;
+  for(let i=0;i<AREA_BREAKS.length-1;i++){
+    const a=AREA_BREAKS[i],b=AREA_BREAKS[i+1];
+    const h0=bottomAt(a)-sampledHeightAt(samples,a)-offset,h1=bottomAt(b)-sampledHeightAt(samples,b)-offset;
+    area+=positiveLinearArea(h0,h1,b-a);
+  }
+  return area;
+}
+function writeSurfaceShape(angle:number,wave:number,phase:number,out:Float64Array){
+  const slope=Math.tan(angle);
+  for(let i=0;i<=SURFACE_SEGMENTS;i++){
+    const x=SURFACE_MIN_X+SURFACE_STEP*i;
+    out[i*2]=x;out[i*2+1]=slope*x+Math.sin(x/17+phase)*wave;
+  }
+  return out;
+}
+export function sampleAreaPreservingSurface(units:number,angle:number,wave:number,phase:number,out:Float64Array=new Float64Array(SURFACE_SAMPLES*2)){
+  writeSurfaceShape(angle,wave,phase,out);
+  const target=canonicalArea(units);
+  let low=0,high=GLASS_BOTTOM+8;
+  for(let i=0;i<24;i++){
+    const mid=(low+high)*.5;
+    if(sampledSurfaceArea(out,mid)>target)low=mid;else high=mid;
+  }
+  const offset=(low+high)*.5;
+  for(let i=0;i<SURFACE_SAMPLES;i++)out[i*2+1]+=offset;
+  return out;
+}

@@ -45,7 +45,7 @@ class LayerView{
     const color=COLORS[layer.color];this.flatFill.tint=this.waveFill.tint=color;
     if(layer.wavy&&layer.surface){
       this.flatFill.visible=this.line.visible=false;this.waveFill.visible=this.waveLine.visible=true;
-      const bottom=layer.bottom+2,bottomV=clampDepth(bottom),samples=layer.surface;
+      const bottom=layer.bottom,bottomV=clampDepth(bottom),samples=layer.surface;
       for(let i=0;i<SURFACE_SAMPLES;i++){
         const x=samples[i*2],y=samples[i*2+1],o=i*4;
         this.fillVertices[o]=x;this.fillVertices[o+1]=y;
@@ -61,7 +61,7 @@ class LayerView{
       this.waveLine.alpha=.35;
     }else{
       this.waveFill.visible=this.waveLine.visible=false;this.flatFill.visible=this.line.visible=true;
-      const bottom=layer.bottom+1,top=layer.top,topV=clampDepth(top),bottomV=clampDepth(bottom);
+      const bottom=layer.bottom,top=layer.top,topV=clampDepth(top),bottomV=clampDepth(bottom);
       this.flatVertices[0]=-220;this.flatVertices[1]=top;this.flatVertices[2]=-220;this.flatVertices[3]=bottom;
       this.flatVertices[4]=220;this.flatVertices[5]=top;this.flatVertices[6]=220;this.flatVertices[7]=bottom;
       this.flatUvs[0]=0;this.flatUvs[1]=topV;this.flatUvs[2]=0;this.flatUvs[3]=bottomV;

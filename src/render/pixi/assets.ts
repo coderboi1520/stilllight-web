@@ -1,13 +1,14 @@
 import { Texture } from 'pixi.js';
 
-function drawClosedGlassPath(ctx:CanvasRenderingContext2D){
+function drawInteriorGlassPath(ctx:CanvasRenderingContext2D){
   ctx.beginPath();
   ctx.moveTo(-33,0);
-  ctx.lineTo(-33,130);
-  ctx.quadraticCurveTo(-33,154,-12,156);
-  ctx.lineTo(12,156);
-  ctx.quadraticCurveTo(33,154,33,130);
-  ctx.lineTo(33,0);
+  ctx.bezierCurveTo(-33,2.485,-18.225,4.5,0,4.5);
+  ctx.bezierCurveTo(18.225,4.5,33,2.485,33,0);
+  ctx.lineTo(33,130);
+  ctx.quadraticCurveTo(33,154,12,156);
+  ctx.lineTo(-12,156);
+  ctx.quadraticCurveTo(-33,154,-33,130);
   ctx.closePath();
 }
 
@@ -80,12 +81,12 @@ export function makeBodyShadowTexture(){
     ctx.fillStyle='rgba(12,31,42,.78)';
     ctx.shadowColor='#000';
     ctx.shadowBlur=7;
-    drawClosedGlassPath(ctx);
+    drawInteriorGlassPath(ctx);
     ctx.fill();
     ctx.globalCompositeOperation='destination-out';
     ctx.shadowBlur=0;
     ctx.fillStyle='#fff';
-    drawClosedGlassPath(ctx);
+    drawInteriorGlassPath(ctx);
     ctx.fill();
   });
 }

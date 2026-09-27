@@ -4,17 +4,6 @@ import type {GlassFrame} from '../../core/RenderFrame.ts';
 import {LiquidView} from './LiquidView.ts';
 import {makeBodyShadowTexture,makeGlassBaseTexture,makeGlassEdgeTexture,makeGlassRimTexture,makeGlowTexture,makeShineTexture} from './assets.ts';
 
-function closedGlassContext(){
-  return new GraphicsContext()
-    .moveTo(-33,0)
-    .lineTo(-33,130)
-    .quadraticCurveTo(-33,154,-12,156)
-    .lineTo(12,156)
-    .quadraticCurveTo(33,154,33,130)
-    .lineTo(33,0)
-    .closePath();
-}
-
 function interiorGlassContext(){
   return new GraphicsContext()
     .moveTo(-33,0)
@@ -48,7 +37,7 @@ export class GlassView{
   root=new Container();
   private shadowTexture=makeBodyShadowTexture();
   private shadow=new Sprite(this.shadowTexture);
-  private body=new Graphics(closedGlassContext());
+  private body=new Graphics(interiorGlassContext());
   private clip=new Graphics(interiorGlassContext()).fill(0xffffff);
   private clipped=new Container();
   private liquid=new LiquidView();
