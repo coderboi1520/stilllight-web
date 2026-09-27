@@ -2,7 +2,7 @@ import './styles.css';
 import { StilllightModel } from './core/model.ts';
 import { StageRenderer } from './render/StageRenderer.ts';
 import { ViewportController } from './render/ViewportController.ts';
-import { HINT_ATTENTION_MS,INVALID_MS,POUR_MS,SELECT_MS,SETTLE_MS } from './core/constants.ts';
+import { HINT_ATTENTION_MS,INVALID_MS,POUR_MS,UNDO_MS,SELECT_MS,SETTLE_MS } from './core/constants.ts';
 import { FrameGate } from './runtime/FrameGate.ts';
 import { snapshotFrame } from './debug/snapshot.ts';
 
@@ -41,6 +41,6 @@ function debugAction(action:'reset'|'select'|'hint'|'invalid'|'pour'|'undo',now:
 let lastDebugFrame:ReturnType<typeof snapshotFrame>|null=null;
 function debugStep(now:number){enterParity();const frame=model.sample(now);renderer.render(frame);lastPresentedFrame=frame;lastRenderedTime=now;lastDebugFrame=snapshotFrame(frame);model.advanceAfterFrame(now);return lastDebugFrame;}
 function stats(values:number[]){if(!values.length)return{count:0,mean:0,p95:0,p99:0};const sorted=[...values].sort((a,b)=>a-b),pick=(q:number)=>sorted[Math.min(sorted.length-1,Math.floor((sorted.length-1)*q))];return{count:values.length,mean:values.reduce((a,b)=>a+b,0)/values.length,p95:pick(.95),p99:pick(.99)};}
-(window as any).__STILLLIGHT_PIXI__={action:debugAction,step:debugStep,enterParity,exitParity,isParity:()=>frameGate.isParity(),state:()=>({board:model.board.map(g=>[...g]),selected:model.selected,busy:model.busy}),lastFrame:()=>lastDebugFrame,backend:()=>renderer.backend,metrics:()=>({prep:stats(metrics.prep),render:stats(metrics.render),frameIntervals:stats(metrics.intervals)}),constants:{POUR_MS,SELECT_MS,INVALID_MS,SETTLE_MS,HINT_ATTENTION_MS}};
+(window as any).__STILLLIGHT_PIXI__={action:debugAction,step:debugStep,enterParity,exitParity,isParity:()=>frameGate.isParity(),state:()=>({board:model.board.map(g=>[...g]),selected:model.selected,busy:model.busy}),lastFrame:()=>lastDebugFrame,backend:()=>renderer.backend,metrics:()=>({prep:stats(metrics.prep),render:stats(metrics.render),frameIntervals:stats(metrics.intervals)}),constants:{POUR_MS,UNDO_MS,SELECT_MS,INVALID_MS,SETTLE_MS,HINT_ATTENTION_MS}};
 
 renderAt(lastRenderedTime,false,false);

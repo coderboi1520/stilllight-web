@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {StilllightModel} from '../src/core/model.ts';
-import {POUR_MS,SETTLE_MS,STREAM_END,TRANSFER_END} from '../src/core/constants.ts';
-import {position,pourDirection,pouringLip} from '../src/core/geometry.ts';
+import {POUR_MS,UNDO_MS} from '../src/core/constants.ts';
+import {position} from '../src/core/geometry.ts';
 import {snapshotFrame} from '../src/debug/snapshot.ts';
 
 const T=10000;
@@ -12,6 +12,7 @@ const colors=(board:readonly (readonly number[])[])=>board.flat().sort((a,b)=>a-
 const shown=(model:StilllightModel,now:number)=>model.sample(now).glasses.map(glass=>glass.layers.reduce((total,layer)=>total+layer.amount,0));
 function move(model:StilllightModel,source:number,target:number,now:number){model.choose(source,now);model.choose(target,now+1);assert.ok(model.flight);return now+1;}
 function finish(model:StilllightModel,started:number){model.sample(started+POUR_MS);model.advanceAfterFrame(started+POUR_MS);assert.equal(model.busy,false);}
+function finishUndo(model:StilllightModel,started:number){model.sample(started+UNDO_MS);model.advanceAfterFrame(started+UNDO_MS);assert.equal(model.busy,false);}
 
 test('successful moves create one bounded history entry while empty, invalid, and reset paths do not',()=>{
   const model=new StilllightModel(),events=model.events;
@@ -53,49 +54,54 @@ test('Undo restores exact layers and conserved colors for single, merged, partia
     assert.equal(model.flight?.source,target);assert.equal(model.flight?.target,source);
     assert.equal(model.flight?.amount,amount);assert.equal(model.flight?.kind,'undo');
     const atStart=shown(model,undoAt);close(atStart[target],after[target].length);close(atStart[source],after[source].length);
-    const mid=undoAt+POUR_MS*.5,midFrame=model.sample(mid),transfer=midFrame.metrics.transfer,atMid=shown(model,mid);
+    const mid=undoAt+UNDO_MS*.5,midFrame=model.sample(mid),transfer=midFrame.metrics.transfer,atMid=shown(model,mid);
     close(atMid[target],after[target].length-amount*transfer);
     close(atMid[source],after[source].length+amount*transfer);
     close(atMid[0]+atMid[1],volume(original));
     const incoming=midFrame.glasses[source].layers.at(-1);
     assert.ok(incoming);assert.equal(incoming.color,model.flight?.color);
     close(incoming.amount,amount*transfer);
-    const atEnd=shown(model,undoAt+POUR_MS);
+    const shownColors=new Map<number,number>();
+    for(const glass of midFrame.glasses)for(const layer of glass.layers)shownColors.set(layer.color,(shownColors.get(layer.color)??0)+layer.amount);
+    for(const color of new Set(colors(original)))close(shownColors.get(color)??0,original.flat().filter(value=>value===color).length);
+    const atEnd=shown(model,undoAt+UNDO_MS);
     close(atEnd[source],original[source].length);close(atEnd[target],original[target].length);
-    finish(model,undoAt);
+    finishUndo(model,undoAt);
     assert.deepEqual(model.board,original);assert.deepEqual(colors(model.board),colors(original));
     assert.equal(model.undoDepth,0);
   }
 });
 
-test('Undo uses the prior receiver as a downward pouring source and lands at exact home with finite recovery',()=>{
+test('Undo restores fill in place over 520 ms with no stream, vessel motion, or terminal liquid speed',()=>{
   const model=new StilllightModel(),started=move(model,0,1,T);finish(model,started);
   const undoAt=started+POUR_MS+100;
+  const before=model.sample(undoAt).glasses.map(glass=>({angle:glass.surfaceAngle,wave:glass.wave,phase:glass.phase}));
   assert.equal(model.undo(undoAt),true);
-  const opening=model.sample(undoAt);
-  for(const index of [0,1]){const home=position(index);close(opening.glasses[index].pose.x,home.x);close(opening.glasses[index].pose.y,home.y);close(opening.glasses[index].pose.angle,0);}
-  const mid=model.sample(undoAt+POUR_MS*.5),stream=mid.stream;
-  assert.ok(stream);assert.equal(mid.glasses[1].moving,true);assert.equal(mid.glasses[0].moving,false);
-  const lip=pouringLip(mid.glasses[1].pose,pourDirection(1,0));
-  close(stream.start.x,lip.x);close(stream.start.y,lip.y);
-  close(stream.end.x,mid.glasses[0].contact.world.x);close(stream.end.y,mid.glasses[0].contact.world.y);
-  assert.ok(stream.end.y>stream.start.y,'inverse stream still falls downward');
-  const transferred=model.board.map(glass=>[...glass]);
-  const tail=model.sample(undoAt+POUR_MS*((TRANSFER_END+STREAM_END)/2));
-  close(tail.metrics.transfer,1);assert.ok(tail.stream);assert.deepEqual(model.board,transferred);
-  const nearPoses=model.sample(undoAt+POUR_MS-.01).glasses.map(glass=>({...glass.pose}));
-  const landed=model.sample(undoAt+POUR_MS);
-  for(const index of [0,1]){
-    const home=position(index),pose=landed.glasses[index].pose,near=nearPoses[index];
-    close(pose.x,home.x);close(pose.y,home.y);close(pose.angle,0);
-    assert.ok(Math.abs((home.x-near.x)/.01)<.002);
-    assert.ok(Math.abs((home.y-near.y)/.01)<.002);
-    assert.ok(Math.abs(near.angle/.01)<.00005);
+  assert.equal(UNDO_MS,520);
+  let previousA=-Infinity,previousB=Infinity;
+  for(const p of [0,.001,.05,.25,.5,.75,.95,.999,1]){
+    const frame=model.sample(undoAt+UNDO_MS*p),amounts=shown(model,undoAt+UNDO_MS*p);
+    assert.equal(frame.stream,null);assert.ok(frame.glasses.every(glass=>!glass.moving));
+    for(const index of [0,1]){
+      const home=position(index),pose=frame.glasses[index].pose;
+      close(pose.x,home.x);close(pose.y,home.y);close(pose.angle,0);
+    }
+    assert.ok(amounts[0]>=previousA-1e-9,'previous source refills monotonically');
+    assert.ok(amounts[1]<=previousB+1e-9,'previous destination drains monotonically');
+    close(amounts[0]+amounts[1],4);
+    previousA=amounts[0];previousB=amounts[1];
   }
-  finish(model,undoAt);
-  const rest=model.sample(undoAt+POUR_MS+SETTLE_MS);
+  const atStart=shown(model,undoAt)[0],nearStart=shown(model,undoAt+UNDO_MS*.001)[0];
+  const nearEnd=shown(model,undoAt+UNDO_MS*.999)[0],atEnd=shown(model,undoAt+UNDO_MS)[0];
+  const middle=(shown(model,undoAt+UNDO_MS*.501)[0]-shown(model,undoAt+UNDO_MS*.499)[0])/(UNDO_MS*.002);
+  assert.ok((nearStart-atStart)/(UNDO_MS*.001)<middle*.02);
+  assert.ok((atEnd-nearEnd)/(UNDO_MS*.001)<middle*.02);
+  const inherited=model.sample(undoAt).glasses;
+  for(const index of [0,1]){close(inherited[index].surfaceAngle,before[index].angle);close(inherited[index].wave,before[index].wave);close(inherited[index].phase,before[index].phase);}
+  finishUndo(model,undoAt);
+  assert.equal(model.settleMotion,null);assert.equal(model.isAnimating(),false);
+  const rest=model.sample(undoAt+UNDO_MS);
   for(const glass of rest.glasses){close(glass.surfaceAngle,0);close(glass.wave,0);}
-  model.advanceAfterFrame(undoAt+POUR_MS+SETTLE_MS);assert.equal(model.isAnimating(),false);
 });
 
 test('busy Undo is ignored, blocks interactions, and repeated fresh Undo pops one move at a time',()=>{
@@ -111,11 +117,11 @@ test('busy Undo is ignored, blocks interactions, and repeated fresh Undo pops on
   assert.equal(model.startPour(undoAt+200),false);
   assert.equal(model.undoDepth,1);assert.equal(model.events.length,eventCount);
   assert.equal(model.selected,null);assert.equal(model.flight?.kind,'undo');
-  finish(model,undoAt);assert.deepEqual(model.board,[[],[1]]);assert.equal(model.undoDepth,1);
-  const next=undoAt+POUR_MS+20;assert.equal(model.undo(next),true);assert.equal(model.undoDepth,0);
-  finish(model,next);assert.deepEqual(model.board,[[1],[]]);
-  assert.equal(model.undo(next+POUR_MS+20),false);
-  model.choose(0,next+POUR_MS+30);assert.equal(model.selected,0,'interaction resumes after Undo gesture');
+  finishUndo(model,undoAt);assert.deepEqual(model.board,[[],[1]]);assert.equal(model.undoDepth,1);
+  const next=undoAt+UNDO_MS+20;assert.equal(model.undo(next),true);assert.equal(model.undoDepth,0);
+  finishUndo(model,next);assert.deepEqual(model.board,[[1],[]]);
+  assert.equal(model.undo(next+UNDO_MS+20),false);
+  model.choose(0,next+UNDO_MS+30);assert.equal(model.selected,0,'interaction resumes after Undo gesture');
 });
 
 test('Undo validates current layers and preserves a borrowed manual frame until the next explicit sample',()=>{
@@ -125,22 +131,22 @@ test('Undo validates current layers and preserves a borrowed manual frame until 
   assert.equal(model.undo(at),false);assert.equal(model.undoDepth,1);
   model.board=expected;
   assert.equal(model.undo(at),true);assert.deepEqual(snapshotFrame(borrowed),frozen);
-  const next=snapshotFrame(model.sample(at));assert.equal(next.glasses[1].moving,true);
+  const next=snapshotFrame(model.sample(at));assert.equal(next.glasses[1].moving,false);assert.equal(next.stream,null);
   assert.deepEqual(next.board,[[2,0,3],[3]]);
 });
 
-test('Undo inherits both presented vessel poses and surfaces while hint and settle are active',()=>{
+test('Undo waits for home pose during a hint, then accepts a fresh input',()=>{
   const model=new StilllightModel(),started=move(model,0,1,T);finish(model,started);
   const hintAt=started+POUR_MS+20;model.hint(hintAt);
   const event=hintAt+115;
-  const before=model.sample(event).glasses.map(glass=>({pose:{...glass.pose},angle:glass.surfaceAngle,wave:glass.wave,phase:glass.phase}));
-  assert.ok(before[0].wave>0&&before[1].wave>0);
-  assert.equal(model.undo(event),true);assert.equal(model.hintMotion,null);assert.equal(model.settleMotion,null);
-  const after=model.sample(event).glasses;
+  assert.equal(model.undo(event),false);assert.equal(model.undoDepth,1);assert.ok(model.hintMotion);
+  const at=hintAt+680;
+  model.advanceAfterFrame(at);
+  const before=model.sample(at).glasses.map(glass=>({angle:glass.surfaceAngle,wave:glass.wave,phase:glass.phase}));
+  assert.equal(model.undo(at),true);
+  const after=model.sample(at).glasses;
   for(const index of [0,1]){
-    close(after[index].pose.x,before[index].pose.x);
-    close(after[index].pose.y,before[index].pose.y);
-    close(after[index].pose.angle,before[index].pose.angle);
+    const home=position(index);close(after[index].pose.x,home.x);close(after[index].pose.y,home.y);
     close(after[index].surfaceAngle,before[index].angle);
     close(after[index].wave,before[index].wave);
     close(after[index].phase,before[index].phase);

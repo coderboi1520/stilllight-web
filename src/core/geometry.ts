@@ -30,4 +30,4 @@ export function invalidFeedbackPose(index:number,progress:number,direction:numbe
   return clampXYZ(hx+direction*deflection,hy,direction*.032*deflection/5,out);
 }
 export function pouringLip(pose:Pose,direction:number,out:Point=pointOut()):Point{const localX=direction*GLASS_HALF_WIDTH;out.x=pose.x+localX*Math.cos(pose.angle);out.y=pose.y+localX*Math.sin(pose.angle);return out;}
-export function streamControl(start:Point,end:Point,direction:number,out:Point=pointOut()):Point{out.x=(start.x+end.x)/2+direction*2.5;out.y=start.y+Math.max(16,(end.y-start.y)*.58);return out;}
+export function streamControl(start:Point,end:Point,_direction:number,out:Point=pointOut()):Point{out.x=start.x;out.y=(start.y+end.y)/2;return out;}

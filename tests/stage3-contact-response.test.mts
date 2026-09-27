@@ -23,7 +23,7 @@ test('both pour directions connect lip to final transformed sampled receiver sur
     close(world.y,receiver.pose.y+local.x*s+local.y*c);
     close(Math.hypot(tangent.x,tangent.y),1);
     close(stream.end.x,world.x);close(stream.end.y,world.y);close(stream.reveal,1);
-    assert.ok(Math.abs(stream.start.x-stream.end.x)>1);
+    close(stream.start.x,stream.end.x);
   }
 });
 
