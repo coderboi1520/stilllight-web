@@ -9,7 +9,7 @@ const close=(a:number,b:number,t=1e-12)=>assert.ok(Math.abs(a-b)<=t,`${a} != ${b
 const closePoint=(a:{x:number;y:number},b:{x:number;y:number})=>{close(a.x,b.x);close(a.y,b.y);};
 const closePose=(a:{x:number;y:number;angle:number},b:{x:number;y:number;angle:number})=>{closePoint(a,b);close(a.angle,b.angle);};
 
-test('unchanged exported geometry numerically matches untouched oracle geometry',()=>{
+test('unchanged geometry matches oracle while the stream retains its axis with a smaller Stage 3.1 bow',()=>{
   for(const i of [0,1])closePoint(candidate.position(i),oracle.position(i));
   for(const v of [-1,0,.03,.25,.5,.73,1,2]){
     close(candidate.clamp01(v),oracle.clamp01(v));
@@ -25,7 +25,10 @@ test('unchanged exported geometry numerically matches untouched oracle geometry'
   const pose=candidate.movingPose(0,1,.5,2.4);
   closePoint(candidate.pouringLip(pose,1),oracle.pouringLip(pose,1));
   const start={x:121.2,y:88.4},end={x:200,y:116};
-  closePoint(candidate.streamControl(start,end,1),oracle.streamControl(start,end,1));
+  const control=candidate.streamControl(start,end,1),original=oracle.streamControl(start,end,1);
+  close(control.y,original.y);
+  close(control.x,(start.x+end.x)/2+2.5);
+  assert.ok(Math.abs(control.x-(start.x+end.x)/2)<Math.abs(original.x-(start.x+end.x)/2)/2);
   assert.equal(candidate.pourDirection(0,1),oracle.pourDirection(0,1));
 });
 

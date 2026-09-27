@@ -20,13 +20,14 @@ test('glass wall and glow paths stay open while fill/mask paths stay closed',()=
   assert.match(assets,/drawOpenWallPath\(ctx\);\s*ctx\.stroke\(\);\s*drawRim/);
 });
 
-test('stream uses retained tapered strips, a half-strength halo, and authored reveal',()=>{
+test('stream uses retained tapered strips, reduced halo/core, and authored reveal',()=>{
   const stream=read('../src/render/pixi/StreamView.ts');
   const assets=read('../src/render/pixi/assets.ts');
   assert.doesNotMatch(stream,/\.clear\(\)/);
   assert.match(stream,/makeStreamHaloTexture\(\)/);
   assert.doesNotMatch(stream,/startCap|endCap|makeStreamHaloCapTexture/);
-  assert.match(stream,/this\.halo\.update\(this\.center,this\.normals,color,stream\.alpha\*\.46,stream\.widthScale\)/);
+  assert.match(stream,/this\.halo\.update\(this\.center,this\.normals,color,stream\.alpha\*\.38,stream\.widthScale\)/);
+  assert.match(stream,/this\.core\.update\(this\.center,this\.normals,'#ffffff',stream\.alpha\*\.30,stream\.widthScale\)/);
   assert.match(assets,/ctx\.shadowBlur=STREAM_BLUR/);
   assert.match(assets,/globalCompositeOperation='destination-out'/);
   assert.match(stream,/colorWidth\(t\)/);

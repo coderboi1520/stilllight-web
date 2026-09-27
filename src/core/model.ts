@@ -5,7 +5,8 @@ import {prepareSurfaceContact} from './contact.ts';
 import {clone,pour} from './rules.ts';
 import type {GlassFrame,LiquidLayerFrame,ReceiverResponseFrame,RenderFrame,StreamFrame} from './RenderFrame.ts';
 
-type Flight={source:number;target:number;before:number[][];amount:number;color:number;started:number};
+type Flight={source:number;target:number;before:number[][];amount:number;color:number;started:number;kind:'pour'|'undo'};
+type MoveHistory={source:number;target:number;color:number;amount:number;beforeSource:readonly number[];beforeTarget:readonly number[];afterSource:readonly number[];afterTarget:readonly number[]};
 type Invalid={source:number;target:number;direction:number;started:number};
 type Pulse={index:number;started:number};
 type SurfaceState={angle:number;wave:number;phase:number};
@@ -19,6 +20,7 @@ const damped=(phase:number,decay:number)=>Math.sin(phase)*Math.exp(-decay);
 const transferAt=(p:number)=>smooth((p-TRANSFER_START)/(TRANSFER_END-TRANSFER_START));
 const HINT_TARGET_DELAY_MS=80,HINT_FADE_IN_MS=70,HINT_FADE_OUT_MS=120;
 const SURFACE_DERIVATIVE_STEP=.05;
+const UNDO_HISTORY_LIMIT=64;
 const RESPONSE_TAPER_START=.55;
 const RESPONSE_TAPER_Q=(RESPONSE_TAPER_START-TRANSFER_START)/(TRANSFER_END-TRANSFER_START);
 const RESPONSE_TAPER_VALUE=4*RESPONSE_TAPER_Q*(1-RESPONSE_TAPER_Q);
@@ -97,8 +99,33 @@ export class StilllightModel{
   private eventKinematics:[EventKinematics,EventKinematics]=[makeEventKinematics(),makeEventKinematics()];
   private targetPose:Pose={x:0,y:0,angle:0};
   private targetVelocity:Pose={x:0,y:0,angle:0};
+  private moveHistory:MoveHistory[]=[];
+
+  get undoDepth(){return this.moveHistory.length;}
 
   private record(...items:string[]){const next=[...this.events,...items];this.events=next.length>32?next.slice(-32):next;}
+
+  private rememberMove(source:number,target:number,color:number,amount:number,before:number[][],after:number[][]){
+    const entry:MoveHistory=Object.freeze({source,target,color,amount,
+      beforeSource:Object.freeze([...before[source]]),beforeTarget:Object.freeze([...before[target]]),
+      afterSource:Object.freeze([...after[source]]),afterTarget:Object.freeze([...after[target]])});
+    if(this.moveHistory.length===UNDO_HISTORY_LIMIT)this.moveHistory.shift();
+    this.moveHistory.push(entry);
+  }
+
+  private capturePair(now:number){this.capturePresented(0,now);this.capturePresented(1,now);}
+
+  private continueClearedPartner(index:number,now:number,hint:Hint|null,settle:Settle|null){
+    const duration=Math.max(hint?DESELECT_RETURN_MS:0,settle?Math.max(0,settle.started+SETTLE_MS-now):0);
+    if(duration<=0)return;
+    this.velocityAt(index,now,this.targetVelocity,false);
+    this.beginCorrection(index,now,duration,this.targetVelocity);
+  }
+
+  private historyMatches(entry:MoveHistory){
+    const same=(actual:readonly number[]|undefined,expected:readonly number[])=>actual?.length===expected.length&&actual.every((color,index)=>color===expected[index]);
+    return same(this.board[entry.source],entry.afterSource)&&same(this.board[entry.target],entry.afterTarget);
+  }
 
   private applyCorrection(index:number,now:number,out:Pose){
     const correction=this.poseCorrections[index];if(!correction)return out;
@@ -191,40 +218,85 @@ export class StilllightModel{
     this.poseCorrections[index]={started:now,duration,dx,dy,da,dvx,dvy,dva};
   }
 
-  reset(){this.board=clone(INITIAL);this.boardFrame=clone(this.board);this.selected=null;this.busy=false;this.flight=this.invalidMotion=this.selectionPulse=this.settleMotion=this.hintMotion=null;this.invalidSource=this.invalidTarget=null;this.poseCorrections[0]=this.poseCorrections[1]=null;this.surfaceCorrections[0]=this.surfaceCorrections[1]=null;this.events=['reset'];}
+  reset(){this.board=clone(INITIAL);this.boardFrame=clone(this.board);this.selected=null;this.busy=false;this.flight=this.invalidMotion=this.selectionPulse=this.settleMotion=this.hintMotion=null;this.invalidSource=this.invalidTarget=null;this.poseCorrections[0]=this.poseCorrections[1]=null;this.surfaceCorrections[0]=this.surfaceCorrections[1]=null;this.moveHistory.length=0;this.events=['reset'];}
 
   choose(index:number,now:number){
     if(this.flight||this.invalidMotion||this.busy)return;
     const source=this.selected;
     if(source===null){
-      if(this.board[index].length){this.capturePresented(index,now);this.settleMotion=null;this.selected=index;this.selectionPulse={index,started:now};this.hintMotion=null;this.velocityAt(index,now,this.targetVelocity,false);this.beginCorrection(index,now,SELECT_MS,this.targetVelocity);this.record(`selected:${index}`);}
+      if(this.board[index].length){
+        const hint=this.hintMotion,settle=this.settleMotion;
+        this.capturePair(now);
+        this.settleMotion=null;this.selected=index;this.selectionPulse={index,started:now};this.hintMotion=null;
+        this.velocityAt(index,now,this.targetVelocity,false);this.beginCorrection(index,now,SELECT_MS,this.targetVelocity);
+        this.continueClearedPartner(1-index,now,hint,settle);
+        this.record(`selected:${index}`);
+      }
       return;
     }
     if(source===index){this.capturePresented(source,now);this.selected=null;this.selectionPulse=null;this.velocityAt(source,now,this.targetVelocity,false);this.beginCorrection(source,now,DESELECT_RETURN_MS,this.targetVelocity);this.record('selection-cleared');return;}
     const result=pour(this.board,source,index);
-    if(!result){const direction=position(index).x>=position(source).x?1:-1;this.capturePresented(source,now);this.selected=null;this.selectionPulse=null;this.settleMotion=null;this.hintMotion=null;this.invalidSource=source;this.invalidTarget=index;this.invalidMotion={source,target:index,direction,started:now};this.busy=true;zeroPose(this.targetVelocity);this.beginCorrection(source,now,INVALID_MS,this.targetVelocity);this.record(`invalid:${source}->${index}`);return;}
-    this.capturePresented(source,now);
-    const before=clone(this.board);this.selected=null;this.selectionPulse=null;this.settleMotion=null;this.invalidSource=this.invalidTarget=null;this.flight={source,target:index,before,amount:result.amount,color:result.color,started:now};this.board=result.board;this.boardFrame=clone(this.board);this.busy=true;zeroPose(this.targetVelocity);this.beginCorrection(source,now,DEPARTURE_BLEND_MS,this.targetVelocity);this.record(`pour-start:${source}->${index}`);
+    if(!result){
+      const direction=position(index).x>=position(source).x?1:-1,hint=this.hintMotion,settle=this.settleMotion;
+      this.capturePair(now);
+      this.selected=null;this.selectionPulse=null;this.settleMotion=null;this.hintMotion=null;
+      this.invalidSource=source;this.invalidTarget=index;this.invalidMotion={source,target:index,direction,started:now};this.busy=true;
+      zeroPose(this.targetVelocity);this.beginCorrection(source,now,INVALID_MS,this.targetVelocity);
+      this.continueClearedPartner(index,now,hint,settle);
+      this.record(`invalid:${source}->${index}`);return;
+    }
+    const settle=this.settleMotion;
+    this.capturePair(now);
+    const before=clone(this.board);
+    this.selected=null;this.selectionPulse=null;this.settleMotion=null;this.invalidSource=this.invalidTarget=null;
+    this.flight={source,target:index,before,amount:result.amount,color:result.color,started:now,kind:'pour'};
+    this.board=result.board;this.boardFrame=clone(this.board);this.busy=true;
+    this.rememberMove(source,index,result.color,result.amount,before,this.board);
+    zeroPose(this.targetVelocity);this.beginCorrection(source,now,DEPARTURE_BLEND_MS,this.targetVelocity);
+    if(settle)this.beginSurfaceCorrection(index,now,DEPARTURE_BLEND_MS);
+    this.record(`pour-start:${source}->${index}`);
+  }
+
+  undo(now:number){
+    if(this.busy||this.flight||this.invalidMotion)return false;
+    const entry=this.moveHistory.at(-1);
+    if(!entry||!this.historyMatches(entry))return false;
+    this.capturePair(now);
+    const before=clone(this.board),selected=this.selected;
+    const restored=clone(this.board);
+    restored[entry.source]=[...entry.beforeSource];restored[entry.target]=[...entry.beforeTarget];
+    this.moveHistory.pop();
+    this.selected=null;this.selectionPulse=null;this.settleMotion=null;this.hintMotion=null;
+    this.invalidSource=this.invalidTarget=null;
+    this.flight={source:entry.target,target:entry.source,before,amount:entry.amount,color:entry.color,started:now,kind:'undo'};
+    this.board=restored;this.boardFrame=clone(restored);this.busy=true;
+    zeroPose(this.targetVelocity);this.beginCorrection(entry.target,now,DEPARTURE_BLEND_MS,this.targetVelocity);
+    this.beginCorrection(entry.source,now,selected===entry.source?DESELECT_RETURN_MS:DEPARTURE_BLEND_MS,this.targetVelocity);
+    this.record(`undo-start:${entry.target}->${entry.source}`);
+    return true;
   }
 
   hint(now:number){if(this.busy||this.hintMotion&&now-this.hintMotion.started<HINT_ATTENTION_MS)return;this.hintMotion={source:0,target:1,started:now};this.record('hint-start');}
 
   invalid(now:number){
     if(this.busy)return;
-    const selected=this.selected;
-    this.capturePresented(0,now);if(selected!==null&&selected!==0)this.capturePresented(selected,now);
+    const selected=this.selected,hint=this.hintMotion;
+    this.capturePair(now);
     this.selected=null;this.selectionPulse=null;this.hintMotion=null;this.invalidSource=0;this.invalidTarget=1;this.invalidMotion={source:0,target:1,direction:1,started:now};this.busy=true;
     zeroPose(this.targetVelocity);this.beginCorrection(0,now,INVALID_MS,this.targetVelocity);
     if(selected!==null&&selected!==0){this.velocityAt(selected,now,this.targetVelocity,false);this.beginCorrection(selected,now,DESELECT_RETURN_MS,this.targetVelocity);}
+    else this.continueClearedPartner(1,now,hint,null);
     this.record('invalid:0->1');
   }
 
   startPour(now:number){
     if(this.busy)return false;const result=pour(this.board,0,1);if(!result)return false;
-    const selected=this.selected;this.capturePresented(0,now);if(selected!==null&&selected!==0)this.capturePresented(selected,now);
-    const before=clone(this.board);this.flight={source:0,target:1,before,amount:result.amount,color:result.color,started:now};this.board=result.board;this.boardFrame=clone(this.board);this.selected=null;this.busy=true;this.settleMotion=null;
+    const selected=this.selected,settle=this.settleMotion;this.capturePair(now);
+    const before=clone(this.board);this.flight={source:0,target:1,before,amount:result.amount,color:result.color,started:now,kind:'pour'};this.board=result.board;this.boardFrame=clone(this.board);this.selected=null;this.busy=true;this.settleMotion=null;
+    this.rememberMove(0,1,result.color,result.amount,before,this.board);
     zeroPose(this.targetVelocity);this.beginCorrection(0,now,DEPARTURE_BLEND_MS,this.targetVelocity);
     if(selected!==null&&selected!==0){this.velocityAt(selected,now,this.targetVelocity,false);this.beginCorrection(selected,now,DESELECT_RETURN_MS,this.targetVelocity);}
+    else if(settle)this.beginSurfaceCorrection(1,now,DEPARTURE_BLEND_MS);
     this.record('pour-start:0->1');return true;
   }
 
@@ -305,7 +377,7 @@ export class StilllightModel{
       this.settleMotion={source:active.source,target:active.target,started:now,surfaces:[
         active.source===0?{...source}:{...target},active.source===1?{...source}:{...target}
       ]};
-      this.record('pour-complete','settle-start');changed=true;
+      this.record(active.kind==='undo'?'undo-complete':'pour-complete','settle-start');changed=true;
     }
     const invalid=this.invalidMotion;if(invalid&&clamp01((now-invalid.started)/INVALID_MS)>=1){this.invalidMotion=null;this.invalidSource=this.invalidTarget=null;this.busy=false;this.record('invalid-complete');changed=true;}
     const pulse=this.selectionPulse;if(pulse&&clamp01((now-pulse.started)/SELECT_MS)>=1){this.selectionPulse=null;this.record('selection-complete');changed=true;}

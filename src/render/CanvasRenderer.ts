@@ -46,7 +46,7 @@ export class CanvasRenderer{
     const reveal=stream.reveal,controlX=stream.start.x+(stream.control.x-stream.start.x)*reveal,controlY=stream.start.y+(stream.control.y-stream.start.y)*reveal;
     const nextX=stream.control.x+(stream.end.x-stream.control.x)*reveal,nextY=stream.control.y+(stream.end.y-stream.control.y)*reveal;
     const endX=controlX+(nextX-controlX)*reveal,endY=controlY+(nextY-controlY)*reveal;
-    ctx.save();ctx.globalAlpha=stream.alpha;ctx.strokeStyle=color;ctx.lineCap='butt';ctx.lineWidth=4.2*stream.widthScale;ctx.shadowColor=color;ctx.shadowBlur=5;ctx.beginPath();ctx.moveTo(stream.start.x,stream.start.y);ctx.quadraticCurveTo(controlX,controlY,endX,endY);ctx.stroke();ctx.shadowBlur=0;ctx.strokeStyle='rgba(255,255,255,.38)';ctx.lineWidth=1.15*stream.widthScale;ctx.beginPath();ctx.moveTo(stream.start.x,stream.start.y);ctx.quadraticCurveTo(controlX,controlY,endX,endY);ctx.stroke();ctx.restore();
+    ctx.save();ctx.globalAlpha=stream.alpha;ctx.strokeStyle=color;ctx.lineCap='butt';ctx.lineWidth=4.2*stream.widthScale;ctx.shadowColor=color;ctx.shadowBlur=4;ctx.beginPath();ctx.moveTo(stream.start.x,stream.start.y);ctx.quadraticCurveTo(controlX,controlY,endX,endY);ctx.stroke();ctx.shadowBlur=0;ctx.strokeStyle='rgba(255,255,255,.30)';ctx.lineWidth=1.15*stream.widthScale;ctx.beginPath();ctx.moveTo(stream.start.x,stream.start.y);ctx.quadraticCurveTo(controlX,controlY,endX,endY);ctx.stroke();ctx.restore();
   }
 
   render(frame:RenderFrame){

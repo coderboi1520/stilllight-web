@@ -72,8 +72,8 @@ export class StreamView{
       this.normals[p]=-ty/length;this.normals[p+1]=tx/length;
     }
     const color=COLORS[stream.color];
-    this.halo.update(this.center,this.normals,color,stream.alpha*.46,stream.widthScale);
+    this.halo.update(this.center,this.normals,color,stream.alpha*.38,stream.widthScale);
     this.colorStroke.update(this.center,this.normals,color,stream.alpha,stream.widthScale);
-    this.core.update(this.center,this.normals,'#ffffff',stream.alpha*.38,stream.widthScale);
+    this.core.update(this.center,this.normals,'#ffffff',stream.alpha*.30,stream.widthScale);
   }
 }
