@@ -48,14 +48,17 @@ export async function run(harness) {
     const mid = await check('mid-pour', 'pour', 1450,
       x => x.state.busy && x.frame.glasses.some(g => g.moving),
       x => x.state.busy && x.frame.glasses.some(g => g.moving));
+    const hintBefore = await check('hint-before-expiry', 'hint', 1679,
+      x => x.frame.glasses[0].hintRole === 'source' && x.frame.glasses[1].hintRole === 'target' && x.frame.glasses.every(g => g.hintStrength > 0 && g.hintStrength < 1),
+      x => x.frame.glasses.every(g => g.hintRole === null && g.hintStrength === 0));
     const hint = await check('hint-expiry', 'hint', 1680,
-      x => x.frame.glasses.some(g => g.hintRole),
-      x => x.frame.glasses.every(g => g.hintRole === null));
+      x => x.frame.glasses.every(g => g.hintRole === null && g.hintStrength === 0),
+      x => x.frame.glasses.every(g => g.hintRole === null && g.hintStrength === 0));
     const pour = await check('pour-completion', 'pour', 2040,
       x => !x.state.busy && x.frame.glasses.some(g => g.moving),
       x => !x.state.busy && x.frame.glasses.every(g => !g.moving));
     if (errors.length) throw new Error(errors.map(e => e.split('\n')[0]).join('; '));
-    return makeResult(name, 'PASS', started, `mid=${mid}; hint=${hint}; pour=${pour}; resize invalidation and next-step transitions stable`, artifacts);
+    return makeResult(name, 'PASS', started, `mid=${mid}; hint-before=${hintBefore}; hint=${hint}; pour=${pour}; resize invalidation and next-step transitions stable`, artifacts);
   } catch (error) { return makeResult(name, 'FAIL', started, error.message, artifacts); }
   finally { await item?.context.close().catch(() => {}); }
 }
