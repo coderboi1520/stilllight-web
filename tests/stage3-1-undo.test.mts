@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {StilllightModel} from '../src/core/model.ts';
-import {POUR_MS,UNDO_MS} from '../src/core/constants.ts';
+import {POUR_MS,SETTLE_MS,UNDO_MS} from '../src/core/constants.ts';
 import {position} from '../src/core/geometry.ts';
 import {snapshotFrame} from '../src/debug/snapshot.ts';
 
@@ -72,7 +72,7 @@ test('Undo restores exact layers and conserved colors for single, merged, partia
   }
 });
 
-test('Undo restores fill in place over 520 ms with no stream, vessel motion, or terminal liquid speed',()=>{
+test('Undo restores fill in place over 520 ms with no stream, vessel motion, or terminal fill speed',()=>{
   const model=new StilllightModel(),started=move(model,0,1,T);finish(model,started);
   const undoAt=started+POUR_MS+100;
   const before=model.sample(undoAt).glasses.map(glass=>({angle:glass.surfaceAngle,wave:glass.wave,phase:glass.phase}));
@@ -98,10 +98,42 @@ test('Undo restores fill in place over 520 ms with no stream, vessel motion, or 
   assert.ok((atEnd-nearEnd)/(UNDO_MS*.001)<middle*.02);
   const inherited=model.sample(undoAt).glasses;
   for(const index of [0,1]){close(inherited[index].surfaceAngle,before[index].angle);close(inherited[index].wave,before[index].wave);close(inherited[index].phase,before[index].phase);}
+  const terminal=model.sample(undoAt+UNDO_MS).glasses.map(glass=>({angle:glass.surfaceAngle,wave:glass.wave,phase:glass.phase}));
   finishUndo(model,undoAt);
+  assert.ok(model.settleMotion);assert.equal(model.isAnimating(),true);
+  const handedOff=model.sample(undoAt+UNDO_MS).glasses;
+  for(const index of [0,1]){close(handedOff[index].surfaceAngle,terminal[index].angle);close(handedOff[index].wave,terminal[index].wave);close(handedOff[index].phase,terminal[index].phase);assert.ok(handedOff[index].wave>0);}
+  const restAt=undoAt+UNDO_MS+SETTLE_MS;
+  model.sample(restAt);model.advanceAfterFrame(restAt);
   assert.equal(model.settleMotion,null);assert.equal(model.isAnimating(),false);
-  const rest=model.sample(undoAt+UNDO_MS);
+  const rest=model.sample(restAt);
   for(const glass of rest.glasses){close(glass.surfaceAngle,0);close(glass.wave,0);}
+});
+
+test('Undo gives refill and drain distinct bounded surface motion through the sampled top boundary',()=>{
+  const model=new StilllightModel();model.board=[[2,3,3],[3]];
+  const started=move(model,0,1,T);finish(model,started);
+  const undoAt=started+POUR_MS+SETTLE_MS+100;
+  model.advanceAfterFrame(undoAt);
+  assert.equal(model.undo(undoAt),true);
+  const first=snapshotFrame(model.sample(undoAt+UNDO_MS*.5));
+  const again=snapshotFrame(model.sample(undoAt+UNDO_MS*.5));
+  assert.deepEqual(again,first,'explicit timestamps produce the same presentation');
+  const refill=first.glasses[0],drain=first.glasses[1];
+  assert.ok(refill.wave>=1.2&&refill.wave<=1.8,`refill wave ${refill.wave}`);
+  assert.ok(drain.wave>=.8&&drain.wave<=1.4,`drain wave ${drain.wave}`);
+  assert.ok(refill.surfaceAngle*drain.surfaceAngle<0);
+  assert.ok(Math.abs(refill.phase-drain.phase)>1);
+  for(const glass of [refill,drain]){
+    const top=glass.layers.at(-1);assert.ok(top?.surface);
+    assert.ok(Math.abs(top.surface[1]-top.surface[Math.floor(top.surface.length/4)*2+1])>.1,'sampled surface is visibly moving');
+  }
+  for(const p of [0,.1,.2,.35,.5,.65,.8,.95,1]){
+    const frame=model.sample(undoAt+UNDO_MS*p);
+    assert.ok(frame.glasses[0].wave>=0&&frame.glasses[0].wave<=1.8);
+    assert.ok(frame.glasses[1].wave>=0&&frame.glasses[1].wave<=1.4);
+    assert.equal(frame.stream,null);
+  }
 });
 
 test('busy Undo is ignored, blocks interactions, and repeated fresh Undo pops one move at a time',()=>{

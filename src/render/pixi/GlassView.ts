@@ -15,6 +15,18 @@ function closedGlassContext(){
     .closePath();
 }
 
+function interiorGlassContext(){
+  return new GraphicsContext()
+    .moveTo(-33,0)
+    .bezierCurveTo(-33,2.485,-18.225,4.5,0,4.5)
+    .bezierCurveTo(18.225,4.5,33,2.485,33,0)
+    .lineTo(33,130)
+    .quadraticCurveTo(33,154,12,156)
+    .lineTo(-12,156)
+    .quadraticCurveTo(-33,154,-33,130)
+    .closePath();
+}
+
 function openWallContext(){
   return new GraphicsContext()
     .moveTo(-33,0)
@@ -37,7 +49,7 @@ export class GlassView{
   private shadowTexture=makeBodyShadowTexture();
   private shadow=new Sprite(this.shadowTexture);
   private body=new Graphics(closedGlassContext());
-  private clip=new Graphics(closedGlassContext()).fill(0xffffff);
+  private clip=new Graphics(interiorGlassContext()).fill(0xffffff);
   private clipped=new Container();
   private liquid=new LiquidView();
   private baseTexture=makeGlassBaseTexture();

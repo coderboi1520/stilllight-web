@@ -20,6 +20,19 @@ test('glass wall and glow paths stay open while fill/mask paths stay closed',()=
   assert.match(assets,/drawOpenWallPath\(ctx\);\s*ctx\.stroke\(\);\s*drawRim/);
 });
 
+test('Pixi glass material stays behind the curved front rim in a retained local mask',()=>{
+  const glass=read('../src/render/pixi/GlassView.ts');
+  const interior=glass.slice(glass.indexOf('function interiorGlassContext'),glass.indexOf('function openWallContext'));
+  const update=glass.slice(glass.indexOf('  update(frame:GlassFrame)'));
+  assert.match(interior,/bezierCurveTo\(-33,2\.485,-18\.225,4\.5,0,4\.5\)/);
+  assert.match(interior,/bezierCurveTo\(18\.225,4\.5,33,2\.485,33,0\)/);
+  assert.match(glass,/private clip=new Graphics\(interiorGlassContext\(\)\)\.fill\(0xffffff\)/);
+  assert.match(glass,/this\.clipped\.addChild\(this\.liquid\.root,this\.baseDepth,this\.reflection,this\.edgeHighlight\)/);
+  assert.match(glass,/this\.clipped\.mask=this\.clip/);
+  assert.ok(glass.indexOf('this.clipped,...this.glowList,this.normal,this.normalRim')>0);
+  assert.doesNotMatch(update,/new Graphics|new Sprite|makeGlass.*Texture/);
+});
+
 test('stream uses retained tapered strips, reduced halo/core, and authored reveal',()=>{
   const stream=read('../src/render/pixi/StreamView.ts');
   const assets=read('../src/render/pixi/assets.ts');

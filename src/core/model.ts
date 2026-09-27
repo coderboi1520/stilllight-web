@@ -59,6 +59,15 @@ function flightSurface(active:Flight,index:number,now:number,out:SurfaceState){
   }
   return out;
 }
+function undoSurface(active:Flight,index:number,now:number,out:SurfaceState){
+  const p=clamp01((now-active.started)/UNDO_MS);
+  const response=smoother(p/.22)*(1-.85*smoother((p-.62)/.38));
+  const refilling=index===active.target;
+  out.angle=(refilling?.014:-.010)*response;
+  out.wave=(refilling?1.5:1.1)*response;
+  out.phase=now*.018+(refilling?-1.1:.85)*smoother(p/.22);
+  return out;
+}
 function zeroPose(out:Pose){out.x=0;out.y=0;out.angle=0;return out;}
 function correctionValue(offset:number,velocity:number,elapsed:number,duration:number){const u=clamp01(elapsed/duration),u2=u*u,u3=u2*u;return(2*u3-3*u2+1)*offset+(u3-2*u2+u)*duration*velocity;}
 function correctionVelocity(offset:number,velocity:number,elapsed:number,duration:number){const u=clamp01(elapsed/duration),u2=u*u;return(6*u2-6*u)/duration*offset+(3*u2-4*u+1)*velocity;}
@@ -171,6 +180,7 @@ export class StilllightModel{
     const active=this.flight,invalid=this.invalidMotion,pulse=this.selectionPulse,settle=this.settleMotion;
     out.angle=0;out.wave=0;out.phase=now*.018;
     if(active?.kind==='pour')flightSurface(active,index,now,out);
+    else if(active?.kind==='undo')undoSurface(active,index,now,out);
     else if(invalid&&index===invalid.source){const p=clamp01((now-invalid.started)/INVALID_MS),envelope=Math.sin(Math.PI*p);out.angle=-invalid.direction*.026*envelope*envelope;out.wave=1.15*envelope*envelope;}
     else if(this.selected===index&&pulse?.index===index){const p=clamp01((now-pulse.started)/SELECT_MS);if(p<1){out.angle=.018*damped(p*Math.PI*4.5,p*2.4);out.wave=1.65*Math.sin(Math.PI*p)*Math.exp(-p*.8);}}
     else if(settle&&(index===settle.source||index===settle.target)){
@@ -382,15 +392,13 @@ export class StilllightModel{
   advanceAfterFrame(now:number){
     let active=this.flight,changed=false;
     if(active&&clamp01((now-active.started)/(active.kind==='undo'?UNDO_MS:POUR_MS))>=1){
-      const source=active.kind==='pour'?this.surfaceAt(active.source,now,this.surfaceStates[active.source]):null;
-      const target=active.kind==='pour'?this.surfaceAt(active.target,now,this.surfaceStates[active.target]):null;
+      const source=this.surfaceAt(active.source,now,this.surfaceStates[active.source]);
+      const target=this.surfaceAt(active.target,now,this.surfaceStates[active.target]);
       this.flight=null;this.busy=false;
-      if(source&&target){
-        this.settleMotion={source:active.source,target:active.target,started:now,surfaces:[
-          active.source===0?{...source}:{...target},active.source===1?{...source}:{...target}
-        ]};
-        this.record('pour-complete','settle-start');
-      }else this.record('undo-complete');
+      this.settleMotion={source:active.source,target:active.target,started:now,surfaces:[
+        active.source===0?{...source}:{...target},active.source===1?{...source}:{...target}
+      ]};
+      this.record(active.kind==='pour'?'pour-complete':'undo-complete','settle-start');
       changed=true;
     }
     const invalid=this.invalidMotion;if(invalid&&clamp01((now-invalid.started)/INVALID_MS)>=1){this.invalidMotion=null;this.invalidSource=this.invalidTarget=null;this.busy=false;this.record('invalid-complete');changed=true;}
