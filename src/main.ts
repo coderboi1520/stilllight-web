@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import './styles.css';
 import { StilllightModel } from './core/model.ts';
 import { StageRenderer } from './render/StageRenderer.ts';
@@ -30,7 +31,7 @@ function invalidateScene(){if(frameGate.isParity()){if(lastPresentedFrame)render
 function choose(i:number){if(frameGate.isParity())return;model.choose(i,performance.now());schedule();}
 
 document.querySelectorAll<HTMLButtonElement>('[data-glass]').forEach(b=>b.addEventListener('click',()=>choose(Number(b.dataset.glass))));
-window.addEventListener('keydown',e=>{if(e.repeat||frameGate.isParity())return;const k=e.key.toLowerCase();if(k==='h'){model.hint(performance.now());schedule();}if(k==='i'){model.invalid(performance.now());schedule();}if(k==='r'){model.reset();schedule();}if(k==='p'){model.startPour(performance.now());schedule();}if(k==='u'||k==='z'&&(e.ctrlKey||e.metaKey)){if(k==='z')e.preventDefault();if(model.undo(performance.now()))schedule();}});
+window.addEventListener('keydown',e=>{if(e.repeat||frameGate.isParity())return;const k=e.key.toLowerCase();if(import.meta.env.DEV&&k==='c'&&!e.ctrlKey&&!e.metaKey&&!e.altKey){model.previewCompletedRight(performance.now());schedule();}if(k==='h'){model.hint(performance.now());schedule();}if(k==='i'){model.invalid(performance.now());schedule();}if(k==='r'){model.reset();schedule();}if(k==='p'){model.startPour(performance.now());schedule();}if(k==='u'||k==='z'&&(e.ctrlKey||e.metaKey)){if(k==='z')e.preventDefault();if(model.undo(performance.now()))schedule();}});
 
 const viewport=new ViewportController(board,s=>renderer.resize(s.width,s.height,s.density),invalidateScene);
 viewport.start();

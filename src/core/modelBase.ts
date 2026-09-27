@@ -241,6 +241,13 @@ export class StilllightModel{
 
   reset(){this.board=clone(INITIAL);this.boardFrame=clone(this.board);this.selected=null;this.busy=false;this.flight=this.invalidMotion=this.selectionPulse=this.settleMotion=this.hintMotion=null;this.invalidSource=this.invalidTarget=null;this.poseCorrections[0]=this.poseCorrections[1]=null;this.surfaceCorrections[0]=this.surfaceCorrections[1]=null;this.capComplete=[isBottleComplete(this.board[0]),isBottleComplete(this.board[1])];this.capMotions=[null,null];this.moveHistory.length=0;this.events=['reset'];}
 
+  previewCompletedRight(now:number){
+    this.reset();
+    const before=this.board;
+    this.board=clone(before);this.board[1]=[3,3,3,3];this.boardFrame=clone(this.board);
+    this.transitionCaps(before,this.board,now,true);
+  }
+
   choose(index:number,now:number){
     if(this.flight||this.invalidMotion||this.busy)return;
     const source=this.selected;

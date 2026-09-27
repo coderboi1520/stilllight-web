@@ -58,6 +58,36 @@ test('Undo during landing begins removal from the presented cap pose',()=>{
   assert.equal(at(model,undoAt+125).visible,false);
 });
 
+test('dev completed-right preview uses canonical board and the real landing transition',()=>{
+  const model=new StilllightModel();
+  assert.equal(model.startPour(T),true);
+  model.previewCompletedRight(T+100);
+  assert.deepEqual(model.board,[[2,0,3],[3,3,3,3]]);
+  assert.deepEqual(model.sample(T+100).board,model.board);
+  assert.equal(model.flight,null);assert.equal(model.busy,false);
+  assert.equal(model.undoDepth,0);
+  const drop=at(model,T+100),contact=at(model,T+185),compression=at(model,T+245),rebound=at(model,T+295),rest=at(model,T+350);
+  assert.equal(drop.visible,true);assert.ok(drop.y<rest.y-9);
+  assert.equal(contact.y,rest.y);assert.ok(compression.scaleX>1&&compression.scaleY<1);
+  assert.ok(rebound.y<rest.y-1);
+  assert.deepEqual(rest,{visible:true,alpha:1,y:1,scaleX:1,scaleY:1,rotation:0});
+  model.reset();
+  assert.deepEqual(model.board,[[2,0,3],[3]]);
+  assert.equal(at(model,T+351).visible,false);
+});
+
+test('dev preview leaves subsequent pour and Undo history valid',()=>{
+  const model=new StilllightModel();model.previewCompletedRight(T);
+  model.choose(1,T+300);model.choose(0,T+301);
+  assert.ok(model.flight);assert.equal(model.undoDepth,1);
+  const end=T+301+POUR_MS;model.sample(end);model.advanceAfterFrame(end);
+  assert.equal(at(model,end,1).visible,false);
+  assert.equal(model.undo(end+100),true);
+  assert.deepEqual(model.board,[[2,0,3],[3,3,3,3]]);
+  model.sample(end+100+UNDO_MS);model.advanceAfterFrame(end+100+UNDO_MS);
+  assert.equal(at(model,end+100+UNDO_MS,1).visible,true);
+});
+
 test('renderers retain a glass-local cap and use the same PNG',()=>{
   const glass=fs.readFileSync(new URL('../src/render/pixi/GlassView.ts',import.meta.url),'utf8');
   const pixi=fs.readFileSync(new URL('../src/render/pixi/PixiRenderer.ts',import.meta.url),'utf8');
