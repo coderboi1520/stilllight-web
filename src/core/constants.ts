@@ -1,6 +1,7 @@
 export const W=400, H=620, EDGE_MARGIN=8, GLASS_HALF_WIDTH=33, GLASS_HEIGHT=156, SELECT_LIFT=10;
 export const CAPACITY=4;
 export const COLORS=['#efb94e','#ef777d','#42cbbd','#a28aeb'] as const;
+export const COMPLETION_ACCENTS=['#fff0bd','#ffe3e5','#c6fff5','#e7dcff'] as const;
 export const INITIAL:number[][]=[[2,0,3],[3]];
 export const POUR_MS=1040, UNDO_MS=520, SELECT_MS=300, INVALID_MS=420, SETTLE_MS=440, HINT_ATTENTION_MS=680;
 export const DESELECT_RETURN_MS=160, DEPARTURE_BLEND_MS=130;

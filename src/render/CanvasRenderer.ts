@@ -1,4 +1,4 @@
-import { COLORS,GLASS_BOTTOM,H,W } from '../core/constants.ts';
+import { COLORS,COMPLETION_ACCENTS,GLASS_BOTTOM,H,W } from '../core/constants.ts';
 import type {GlassFrame,LiquidLayerFrame,RenderFrame,StreamFrame} from '../core/RenderFrame.ts';
 
 const DEPTH_COLORS=COLORS.map(color=>`#${[1,3,5].map(at=>Math.round(parseInt(color.slice(at,at+2),16)*.87).toString(16).padStart(2,'0')).join('')}`);
@@ -31,7 +31,7 @@ export class CanvasRenderer{
   }
 
   private glass(frame:GlassFrame){
-    const ctx=this.ctx;ctx.save();ctx.translate(frame.pose.x,frame.pose.y);ctx.rotate(frame.pose.angle);
+    const ctx=this.ctx;ctx.save();ctx.translate(frame.pose.x,frame.pose.y+frame.completion.recoilY);ctx.rotate(frame.pose.angle);
     ctx.save();ctx.shadowColor='#000';ctx.shadowBlur=7;ctx.fillStyle='rgba(12,31,42,.78)';closedGlassPath(ctx);ctx.fill();ctx.restore();
     ctx.save();closedGlassPath(ctx);ctx.clip();
     ctx.save();ctx.rotate(frame.relativeLiquidRotation);for(let i=0;i<frame.layers.length;i++){const layer=frame.layers[i],next=frame.layers[i+1];this.layer(ctx,layer,!next||next.color!==layer.color);}
@@ -44,6 +44,7 @@ export class CanvasRenderer{
     if(frame.invalid){ctx.save();ctx.globalAlpha=.65*frame.invalidStrength;outline(ctx,'#ff8e94',3,'#ffb0b5',1.4);ctx.restore();}else if(frame.selected)outline(ctx,'#f5d38e',1.6,'#f9e1ae',1.8);else outline(ctx,'rgba(200,225,237,.61)',1.6,'rgba(230,243,248,.78)',1.4);
     ctx.strokeStyle='rgba(255,255,255,.32)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-25,14);ctx.lineTo(-25,123);ctx.stroke();
     if(frame.cap.visible&&this.capImage){ctx.save();ctx.translate(0,frame.cap.y);ctx.rotate(frame.cap.rotation);ctx.scale(frame.cap.scaleX,frame.cap.scaleY);ctx.globalAlpha=frame.cap.alpha;ctx.drawImage(this.capImage,-55,-110*1055/1254,110,110);ctx.restore();}
+    for(const p of frame.completion.particles){if(!p.visible)continue;ctx.save();ctx.beginPath();ctx.arc(p.x,p.y,p.radius,0,Math.PI*2);if(p.bubble){ctx.globalAlpha=p.alpha;ctx.strokeStyle='#e9f7ff';ctx.lineWidth=.8;ctx.stroke();}else{ctx.fillStyle=COMPLETION_ACCENTS[frame.completion.color];ctx.globalAlpha=p.alpha*.16;ctx.beginPath();ctx.arc(p.x,p.y,p.radius*1.7,0,Math.PI*2);ctx.fill();ctx.globalAlpha=p.alpha;ctx.beginPath();ctx.arc(p.x,p.y,p.radius*.75,0,Math.PI*2);ctx.fill();}ctx.restore();}
     ctx.restore();
   }
 

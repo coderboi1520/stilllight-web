@@ -1,6 +1,7 @@
 import { Container,Graphics,GraphicsContext,Sprite } from 'pixi.js';
 import type {Texture} from 'pixi.js';
 import type {GlassFrame} from '../../core/RenderFrame.ts';
+import {COMPLETION_ACCENTS} from '../../core/constants.ts';
 import {LiquidView} from './LiquidView.ts';
 import {makeBodyShadowTexture,makeGlassBaseTexture,makeGlassEdgeTexture,makeGlassRimTexture,makeGlowTexture,makeShineTexture} from './assets.ts';
 
@@ -51,6 +52,7 @@ export class GlassView{
   private normalRim=new Sprite(this.rimTexture);
   private cap=new Sprite();
   private capScale=1;
+  private particles:Graphics[]=[];
   private normal=new Graphics(openWallContext()).stroke({color:'#b9d8e66f',width:1.25});
   private selected=outline('#f5d38e',1.6,'#f9e1ae',1.8);
   private invalid=outline('#ff8e94',3,'#ffb0b5',1.4);
@@ -89,7 +91,8 @@ export class GlassView{
     }
     this.clipped.addChild(this.liquid.root,this.baseDepth,this.reflection,this.edgeHighlight);
     this.clipped.mask=this.clip;
-    this.root.addChild(this.shadow,this.body,this.clip,this.clipped,...this.glowList,this.normal,this.normalRim,this.selected,this.invalid,this.cap);
+    for(let i=0;i<12;i++){const particle=i<8?new Graphics().circle(0,0,1.7).fill({color:0xffffff,alpha:.16}).circle(0,0,.75).fill(0xffffff):new Graphics().circle(0,0,1).stroke({color:0xffffff,width:.45});particle.visible=false;this.particles.push(particle);}
+    this.root.addChild(this.shadow,this.body,this.clip,this.clipped,...this.glowList,this.normal,this.normalRim,this.selected,this.invalid,this.cap,...this.particles);
     this.selected.visible=this.invalid.visible=false;
   }
 
@@ -103,13 +106,19 @@ export class GlassView{
   }
 
   update(frame:GlassFrame){
-    this.root.position.set(frame.pose.x,frame.pose.y);
+    this.root.position.set(frame.pose.x,frame.pose.y+frame.completion.recoilY);
     this.root.rotation=frame.pose.angle;
     this.cap.visible=frame.cap.visible;
     this.cap.position.set(0,frame.cap.y);
     this.cap.scale.set(this.capScale*frame.cap.scaleX,this.capScale*frame.cap.scaleY);
     this.cap.rotation=frame.cap.rotation;
     this.cap.alpha=frame.cap.alpha;
+    for(let i=0;i<this.particles.length;i++){
+      const particle=this.particles[i],state=frame.completion.particles[i];particle.visible=state.visible;
+      if(!state.visible)continue;
+      particle.position.set(state.x,state.y);particle.scale.set(state.radius);particle.alpha=state.alpha;
+      particle.tint=state.bubble?'#e9f7ff':COMPLETION_ACCENTS[frame.completion.color];
+    }
     this.reflection.x=-34+Math.max(-2,Math.min(2,-Math.sin(frame.pose.angle)*2));
     this.liquid.update(frame);
     for(const g of this.glowList)g.visible=false;
