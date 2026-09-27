@@ -49,6 +49,8 @@ export class GlassView{
   private edgeHighlight=new Sprite(this.edgeTexture);
   private rimTexture=makeGlassRimTexture();
   private normalRim=new Sprite(this.rimTexture);
+  private cap=new Sprite();
+  private capScale=1;
   private normal=new Graphics(openWallContext()).stroke({color:'#b9d8e66f',width:1.25});
   private selected=outline('#f5d38e',1.6,'#f9e1ae',1.8);
   private invalid=outline('#ff8e94',3,'#ffb0b5',1.4);
@@ -57,7 +59,12 @@ export class GlassView{
   private ownedTextures:Texture[]=[this.shadowTexture,this.baseTexture,this.reflectionTexture,this.edgeTexture,this.rimTexture];
   private destroyed=false;
 
-  constructor(){
+  constructor(capTexture:Texture){
+    this.cap.texture=capTexture;
+    this.cap.anchor.set(.5,1055/1254);
+    this.capScale=110/capTexture.width;
+    this.cap.scale.set(this.capScale);
+    this.cap.visible=false;
     this.shadow.position.set(-90,-36);
     this.shadow.width=180;
     this.shadow.height=230;
@@ -82,7 +89,7 @@ export class GlassView{
     }
     this.clipped.addChild(this.liquid.root,this.baseDepth,this.reflection,this.edgeHighlight);
     this.clipped.mask=this.clip;
-    this.root.addChild(this.shadow,this.body,this.clip,this.clipped,...this.glowList,this.normal,this.normalRim,this.selected,this.invalid);
+    this.root.addChild(this.shadow,this.body,this.clip,this.clipped,...this.glowList,this.normal,this.normalRim,this.selected,this.invalid,this.cap);
     this.selected.visible=this.invalid.visible=false;
   }
 
@@ -98,6 +105,11 @@ export class GlassView{
   update(frame:GlassFrame){
     this.root.position.set(frame.pose.x,frame.pose.y);
     this.root.rotation=frame.pose.angle;
+    this.cap.visible=frame.cap.visible;
+    this.cap.position.set(0,frame.cap.y);
+    this.cap.scale.set(this.capScale*frame.cap.scaleX,this.capScale*frame.cap.scaleY);
+    this.cap.rotation=frame.cap.rotation;
+    this.cap.alpha=frame.cap.alpha;
     this.reflection.x=-34+Math.max(-2,Math.min(2,-Math.sin(frame.pose.angle)*2));
     this.liquid.update(frame);
     for(const g of this.glowList)g.visible=false;

@@ -1,4 +1,5 @@
-import { Application,Container } from 'pixi.js';
+import { Application,Assets,Container } from 'pixi.js';
+import type {Texture} from 'pixi.js';
 import { H,W } from '../../core/constants.ts';
 import type {RenderFrame} from '../../core/RenderFrame.ts';
 import {GlassView} from './GlassView.ts';
@@ -15,6 +16,7 @@ export class PixiRenderer{
   private initialized=false;
   private movingIndex=-2;
   private density=1;
+  private capTexture:Texture|null=null;
   private onRestore:()=>void=()=>{};
   private restoreHandler=()=>{this.onRestore();};
 
@@ -32,6 +34,7 @@ export class PixiRenderer{
     // scheduler otherwise keeps Ticker.system alive solely for periodic GC.
     this.app.renderer.gc.enabled=false;
     this.app.renderer.scheduler.destroy();
+    this.capTexture=await Assets.load<Texture>('/assets/chicken-cap.png');
     host.appendChild(this.app.canvas);
     this.app.stage.addChild(this.scene);
     this.rebuildViews(false);
@@ -46,7 +49,8 @@ export class PixiRenderer{
       this.retiredViews.push(this.glasses[0],this.glasses[1]);
       if(this.stream)this.retiredViews.push(this.stream);
     }
-    this.glasses=[new GlassView(),new GlassView()];this.stream=new StreamView();this.scene.addChild(this.glasses[0].root,this.glasses[1].root,this.stream.root);this.movingIndex=-2;
+    if(!this.capTexture)throw new Error('Chicken cap texture unavailable');
+    this.glasses=[new GlassView(this.capTexture),new GlassView(this.capTexture)];this.stream=new StreamView();this.scene.addChild(this.glasses[0].root,this.glasses[1].root,this.stream.root);this.movingIndex=-2;
   }
 
   private destroyRetiredViews(){for(const view of this.retiredViews)view.destroy();this.retiredViews.length=0;}

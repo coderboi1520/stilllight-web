@@ -14,8 +14,9 @@ export class CanvasRenderer{
   private width=W;
   private height=H;
   private density=1;
+  private capImage:HTMLImageElement|null=null;
 
-  async init(host:HTMLElement){this.canvas.setAttribute('aria-hidden','true');host.appendChild(this.canvas);}
+  async init(host:HTMLElement){this.capImage=new Image();this.capImage.src='/assets/chicken-cap.png';await this.capImage.decode();this.canvas.setAttribute('aria-hidden','true');host.appendChild(this.canvas);}
   resize(width:number,height:number,density:number){this.width=Math.max(1,width);this.height=Math.max(1,height);this.density=Math.max(1,Math.min(density,2));this.canvas.width=Math.max(1,Math.round(this.width*this.density));this.canvas.height=Math.max(1,Math.round(this.height*this.density));this.canvas.style.width=`${this.width}px`;this.canvas.style.height=`${this.height}px`;}
   destroy(){this.canvas.remove();}
 
@@ -41,7 +42,9 @@ export class CanvasRenderer{
     const glow=frame.invalid?'#ff8e94':frame.hintRole==='source'?'#f5d38e':frame.hintRole==='target'?'#83e0d4':frame.selected?'#f5d38e':null;
     if(glow){ctx.save();ctx.globalAlpha=frame.invalid?.55*frame.invalidStrength:frame.hintRole?frame.hintStrength:1;ctx.shadowColor=glow;ctx.shadowBlur=frame.invalid?12:16;outline(ctx,glow,frame.invalid?3:2.4,glow,frame.invalid?3:2.4);ctx.restore();}
     if(frame.invalid){ctx.save();ctx.globalAlpha=.65*frame.invalidStrength;outline(ctx,'#ff8e94',3,'#ffb0b5',1.4);ctx.restore();}else if(frame.selected)outline(ctx,'#f5d38e',1.6,'#f9e1ae',1.8);else outline(ctx,'rgba(200,225,237,.61)',1.6,'rgba(230,243,248,.78)',1.4);
-    ctx.strokeStyle='rgba(255,255,255,.32)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-25,14);ctx.lineTo(-25,123);ctx.stroke();ctx.restore();
+    ctx.strokeStyle='rgba(255,255,255,.32)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-25,14);ctx.lineTo(-25,123);ctx.stroke();
+    if(frame.cap.visible&&this.capImage){ctx.save();ctx.translate(0,frame.cap.y);ctx.rotate(frame.cap.rotation);ctx.scale(frame.cap.scaleX,frame.cap.scaleY);ctx.globalAlpha=frame.cap.alpha;ctx.drawImage(this.capImage,-55,-110*1055/1254,110,110);ctx.restore();}
+    ctx.restore();
   }
 
   private stream(stream:StreamFrame|null){
