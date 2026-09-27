@@ -40,7 +40,7 @@ class LayerView{
     flatGeometry.destroy(true);fillGeometry.destroy(true);lineGeometry.destroy(true);
   }
 
-  update(layer:LiquidLayerFrame){
+  update(layer:LiquidLayerFrame,showBoundary=true){
     this.root.visible=layer.amount>.0001;
     const color=COLORS[layer.color];this.flatFill.tint=this.waveFill.tint=color;
     if(layer.wavy&&layer.surface){
@@ -60,7 +60,7 @@ class LayerView{
       this.waveFill.geometry.getBuffer('aUV').update();
       this.waveLine.alpha=.35;
     }else{
-      this.waveFill.visible=this.waveLine.visible=false;this.flatFill.visible=this.line.visible=true;
+      this.waveFill.visible=this.waveLine.visible=false;this.flatFill.visible=true;this.line.visible=layer.isTop||showBoundary;
       const bottom=layer.bottom,top=layer.top,topV=clampDepth(top),bottomV=clampDepth(bottom);
       this.flatVertices[0]=-220;this.flatVertices[1]=top;this.flatVertices[2]=-220;this.flatVertices[3]=bottom;
       this.flatVertices[4]=220;this.flatVertices[5]=top;this.flatVertices[6]=220;this.flatVertices[7]=bottom;
@@ -96,7 +96,10 @@ export class LiquidView{
   destroy(){for(const layer of this.layers)layer.destroy();this.response.destroy();this.root.destroy();this.depthTexture.destroy(true);}
   update(frame:GlassFrame){
     this.root.rotation=frame.relativeLiquidRotation;
-    for(let i=0;i<this.layers.length;i++){const layer=frame.layers[i];this.layers[i].root.visible=!!layer;if(layer)this.layers[i].update(layer);}
+    for(let i=0;i<this.layers.length;i++){
+      const layer=frame.layers[i];this.layers[i].root.visible=!!layer;
+      if(layer){const next=frame.layers[i+1];this.layers[i].update(layer,!next||next.color!==layer.color);}
+    }
     this.response.update(frame.response);
   }
 }
