@@ -62,6 +62,41 @@ test('Undo during landing begins removal from the presented cap pose',()=>{
   assert.equal(at(model,undoAt+125).visible,false);
 });
 
+test('refined Undo clears completion effects and reaches idle before completing again',()=>{
+  for(const delay of [40,250,1000]){
+    const model=new StilllightModel(),original=[[3],[3,3,3]];
+    model.board=original.map(glass=>[...glass]);
+    let started=T;
+    for(let cycle=0;cycle<3;cycle++){
+      assert.equal(model.startPour(started),true);
+      const completed=started+POUR_MS;
+      model.sample(completed);model.advanceAfterFrame(completed);
+      assert.equal(at(model,completed).visible,true);
+      const undoAt=completed+delay;
+      model.sample(undoAt);model.advanceAfterFrame(undoAt);
+      const before=at(model,undoAt);
+      assert.equal(model.undo(undoAt),true);
+      assert.deepEqual(model.board,original);
+      assert.deepEqual(at(model,undoAt),before,'exit starts from presented cap pose');
+      for(const elapsed of [0,65,125,260,420,520]){
+        const frame=model.sample(undoAt+elapsed),glass=frame.glasses[1];
+        assert.equal(frame.stream,null);
+        assert.equal(glass.completion.recoilY,0);
+        assert.equal(glass.completion.particles.some(p=>p.visible),false);
+        if(elapsed>=125)assert.equal(glass.cap.visible,false);
+        if(elapsed>=420)assert.equal(frame.metrics.transfer,1);
+      }
+      model.advanceAfterFrame(undoAt+UNDO_MS);
+      assert.equal(model.busy,false);assert.equal(model.flight,null);
+      assert.equal(model.settleMotion,null);assert.equal(model.isAnimating(),false);
+      const rest=model.sample(undoAt+UNDO_MS);
+      for(const glass of rest.glasses){assert.equal(glass.wave,0);assert.equal(glass.surfaceAngle,0);}
+      assert.deepEqual(model.board,original);
+      started=undoAt+UNDO_MS+1;
+    }
+  }
+});
+
 test('dev completed-right preview uses canonical board and the real landing transition',()=>{
   const model=new StilllightModel();
   assert.equal(model.startPour(T),true);

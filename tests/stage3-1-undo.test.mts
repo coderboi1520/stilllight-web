@@ -99,15 +99,42 @@ test('Undo restores fill in place over 520 ms with no stream, vessel motion, or 
   const inherited=model.sample(undoAt).glasses;
   for(const index of [0,1]){close(inherited[index].surfaceAngle,before[index].angle);close(inherited[index].wave,before[index].wave);close(inherited[index].phase,before[index].phase);}
   const terminal=model.sample(undoAt+UNDO_MS).glasses.map(glass=>({angle:glass.surfaceAngle,wave:glass.wave,phase:glass.phase}));
+  for(const glass of terminal){close(glass.angle,0);close(glass.wave,0);}
   finishUndo(model,undoAt);
-  assert.ok(model.settleMotion);assert.equal(model.isAnimating(),true);
+  assert.equal(model.settleMotion,null);assert.equal(model.isAnimating(),false);
   const handedOff=model.sample(undoAt+UNDO_MS).glasses;
-  for(const index of [0,1]){close(handedOff[index].surfaceAngle,terminal[index].angle);close(handedOff[index].wave,terminal[index].wave);close(handedOff[index].phase,terminal[index].phase);assert.ok(handedOff[index].wave>0);}
+  for(const index of [0,1]){close(handedOff[index].surfaceAngle,0);close(handedOff[index].wave,0);}
   const restAt=undoAt+UNDO_MS+SETTLE_MS;
   model.sample(restAt);model.advanceAfterFrame(restAt);
   assert.equal(model.settleMotion,null);assert.equal(model.isAnimating(),false);
   const rest=model.sample(restAt);
   for(const glass of rest.glasses){close(glass.surfaceAngle,0);close(glass.wave,0);}
+});
+
+test('Undo engages gently, carries volume through the middle, and leaves time for an in-duration rebound',()=>{
+  const model=new StilllightModel(),started=move(model,0,1,T);finish(model,started);
+  const undoAt=started+POUR_MS+SETTLE_MS+100;model.advanceAfterFrame(undoAt);
+  assert.equal(model.undo(undoAt),true);
+  const transfer=(ms:number)=>model.sample(undoAt+ms).metrics.transfer;
+  assert.equal(transfer(0),0);
+  assert.ok(transfer(60)>0&&transfer(60)<.04,'gentle engage without a delay');
+  assert.ok(transfer(260)>.65&&transfer(260)<.8,'responsive middle');
+  assert.ok(transfer(390)>.98,'most volume arrives before the settle');
+  assert.equal(transfer(420),1);
+  const middle=snapshotFrame(model.sample(undoAt+210));
+  const rebound=snapshotFrame(model.sample(undoAt+460));
+  for(const index of [0,1]){
+    assert.ok(middle.glasses[index].surfaceAngle*rebound.glasses[index].surfaceAngle<0,'one restrained counter-lean');
+    assert.ok(rebound.glasses[index].wave>0&&rebound.glasses[index].wave<middle.glasses[index].wave*.3);
+  }
+  assert.ok(middle.glasses[0].wave>middle.glasses[1].wave,'refill is slightly more energetic');
+  let previous=0;
+  for(let ms=0;ms<=UNDO_MS;ms++){
+    const frame=model.sample(undoAt+ms),q=frame.metrics.transfer;
+    assert.ok(q>=previous&&q<=1);previous=q;
+    close(shown(model,undoAt+ms).reduce((sum,value)=>sum+value,0),4,1e-12);
+    assert.equal(frame.stream,null);
+  }
 });
 
 test('Undo gives refill and drain distinct bounded surface motion through the sampled top boundary',()=>{

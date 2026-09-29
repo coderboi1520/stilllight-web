@@ -19,6 +19,9 @@ type EventKinematics={pose:Pose;velocity:Pose};
 
 const damped=(phase:number,decay:number)=>Math.sin(phase)*Math.exp(-decay);
 const transferAt=(p:number)=>smooth((p-TRANSFER_START)/(TRANSFER_END-TRANSFER_START));
+// Finish the eased volume transfer at 420 ms, leaving 100 ms for surface recovery.
+const UNDO_TRANSFER_END=420/UNDO_MS;
+const undoTransferAt=(p:number)=>smoother(p/UNDO_TRANSFER_END);
 const HINT_TARGET_DELAY_MS=80,HINT_FADE_IN_MS=70,HINT_FADE_OUT_MS=120;
 const SURFACE_DERIVATIVE_STEP=.05;
 const UNDO_HISTORY_LIMIT=64;
@@ -62,11 +65,13 @@ function flightSurface(active:Flight,index:number,now:number,out:SurfaceState){
 }
 function undoSurface(active:Flight,index:number,now:number,out:SurfaceState){
   const p=clamp01((now-active.started)/UNDO_MS);
-  const response=smoother(p/.22)*(1-.85*smoother((p-.62)/.38));
+  const t=clamp01(p/UNDO_TRANSFER_END),q=clamp01((p-300/UNDO_MS)/(1-300/UNDO_MS));
+  // A speed-shaped response followed by one smaller, opposite lean; both end at rest.
+  const response=16*t*t*(1-t)*(1-t),rebound=16*q*q*(1-q)*(1-q);
   const refilling=index===active.target;
-  out.angle=(refilling?.014:-.010)*response;
-  out.wave=(refilling?1.5:1.1)*response;
-  out.phase=now*.018+(refilling?-1.1:.85)*smoother(p/.22);
+  out.angle=(refilling?.016:-.009)*response-(refilling?.004:-.0025)*rebound;
+  out.wave=(refilling?1.7:1.0)*response+(refilling?.3:.16)*rebound;
+  out.phase=active.started*.018+p*UNDO_MS*.010+(refilling?-1.1:.85)*undoTransferAt(p);
   return out;
 }
 function zeroPose(out:Pose){out.x=0;out.y=0;out.angle=0;return out;}
@@ -338,7 +343,7 @@ export class StilllightModel{
 
   sample(now:number):RenderFrame{
     const active=this.flight,invalid=this.invalidMotion,settling=this.settleMotion,hint=this.hintMotion;
-    const progress=active?clamp01((now-active.started)/(active.kind==='undo'?UNDO_MS:POUR_MS)):0,transfer=active?(active.kind==='undo'?smooth(progress):transferAt(progress)):0,invalidProgress=invalid?clamp01((now-invalid.started)/INVALID_MS):0,settleProgress=settling?clamp01((now-settling.started)/SETTLE_MS):0,activeDirection=active?pourDirection(active.source,active.target):1;
+    const progress=active?clamp01((now-active.started)/(active.kind==='undo'?UNDO_MS:POUR_MS)):0,transfer=active?(active.kind==='undo'?undoTransferAt(progress):transferAt(progress)):0,invalidProgress=invalid?clamp01((now-invalid.started)/INVALID_MS):0,settleProgress=settling?clamp01((now-settling.started)/SETTLE_MS):0,activeDirection=active?pourDirection(active.source,active.target):1;
 
     const makeGlass=(index:number,moving=false)=>{
       const frame=this.glassFrames[index];
@@ -419,10 +424,13 @@ export class StilllightModel{
       const target=this.surfaceAt(active.target,now,this.surfaceStates[active.target]);
       this.flight=null;this.busy=false;
       this.transitionCaps(active.before,this.board,now,true);
-      this.settleMotion={source:active.source,target:active.target,started:now,surfaces:[
-        active.source===0?{...source}:{...target},active.source===1?{...source}:{...target}
-      ]};
-      this.record(active.kind==='pour'?'pour-complete':'undo-complete','settle-start');
+      if(active.kind==='undo')this.record('undo-complete');
+      else{
+        this.settleMotion={source:active.source,target:active.target,started:now,surfaces:[
+          active.source===0?{...source}:{...target},active.source===1?{...source}:{...target}
+        ]};
+        this.record('pour-complete','settle-start');
+      }
       changed=true;
     }
     const invalid=this.invalidMotion;if(invalid&&clamp01((now-invalid.started)/INVALID_MS)>=1){this.invalidMotion=null;this.invalidSource=this.invalidTarget=null;this.busy=false;this.record('invalid-complete');changed=true;}

@@ -23,7 +23,6 @@ export class StilllightModel extends BaseStilllightModel{
     for(const glass of frame.glasses){
       let total=0,boundary=liquidLevel(0,0);
       for(const layer of glass.layers){
-        if(layer.amount<=EPSILON)continue;
         layer.bottom=boundary;
         total+=layer.amount;
         layer.top=liquidLevel(total,0);
@@ -35,6 +34,11 @@ export class StilllightModel extends BaseStilllightModel{
       if(top){
         top.isTop=true;top.wavy=true;
         sampleAreaPreservingSurface(total,glass.surfaceAngle,glass.wave,glass.phase,top.surface!);
+        // Renderers hide tiny bodies; keep the surface on the visible same-color mass too.
+        const below=glass.layers[glass.layers.length-2];
+        if(top.amount<=EPSILON&&below&&below.color===top.color){
+          below.wavy=true;below.surface!.set(top.surface!);
+        }
       }
       glass.relativeLiquidRotation=0;
     }

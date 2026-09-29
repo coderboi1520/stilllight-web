@@ -52,7 +52,7 @@ export function sampleCap(complete:boolean,motion:CapMotion|null,now:number,out:
   if(motion.kind==='exit'){
     if(elapsed>=CAP_EXIT_MS){out.visible=false;return out;}
     const p=smooth(elapsed/CAP_EXIT_MS);
-    out.visible=true;out.y=motion.from.y-4*p;out.scaleX=motion.from.scaleX*(1-.07*p);out.scaleY=motion.from.scaleY*(1-.07*p);out.alpha=motion.from.alpha*(1-p);
+    out.visible=true;out.y=motion.from.y-4*p;out.scaleX=motion.from.scaleX*(1-.07*p);out.scaleY=motion.from.scaleY*(1-.07*p);out.rotation=motion.from.rotation*(1-p);out.alpha=motion.from.alpha*(1-p);
     return out;
   }
   out.visible=true;

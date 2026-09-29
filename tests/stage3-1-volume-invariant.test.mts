@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {StilllightModel} from '../src/core/model.ts';
-import {INITIAL,POUR_MS,SETTLE_MS,UNDO_MS} from '../src/core/constants.ts';
+import {EPSILON,INITIAL,POUR_MS,SETTLE_MS,UNDO_MS} from '../src/core/constants.ts';
 import {canonicalArea,liquidLevel} from '../src/core/liquidMath.ts';
 
 const T=40000;
@@ -42,11 +42,45 @@ test('Undo preserves untouched canonical layer geometry and area at 0/25/50/75/1
     if(transfer<1){const outgoing=right.layers[1];assert.ok(outgoing);close(outgoing.amount,1-transfer,1e-12);}else assert.equal(right.layers.length,1);
   }
   model.sample(undoAt+UNDO_MS);model.advanceAfterFrame(undoAt+UNDO_MS);
-  assert.ok(model.settleMotion);
+  assert.equal(model.settleMotion,null);assert.equal(model.isAnimating(),false);
   for(const p of [.25,.5,.75,1]){
     const at=undoAt+UNDO_MS+SETTLE_MS*p,frame=model.sample(at);
     assertLowerCanonical(frame.glasses[0],3);assertLowerCanonical(frame.glasses[1],1);
     assertAreaPreserved(frame.glasses[0]);assertAreaPreserved(frame.glasses[1]);
+  }
+});
+
+test('Undo keeps sub-epsilon refill and drain surfaces attached to their actual conserved volume',()=>{
+  for(const board of [[[2,3],[3]],[[3],[]],[[2,3,3],[3]]]){
+    const model=new StilllightModel();model.board=board.map(glass=>[...glass]);
+    const started=move(model,0,1,T),settled=finishPourAndSettle(model,started),undoAt=settled+50;
+    assert.equal(model.undo(undoAt),true);
+    for(const ms of [.01,.1,1,2,419,419.9,420,519.9,520]){
+      const frame=model.sample(undoAt+ms);
+      close(amountOf(frame.glasses[0])+amountOf(frame.glasses[1]),board.flat().length,1e-12);
+      for(const glass of frame.glasses){
+        assertAreaPreserved(glass);
+        assert.ok(glass.layers.every(layer=>layer.amount>0));
+        const top=glass.layers.at(-1);
+        if(top){close(top.top,liquidLevel(amountOf(glass),0),1e-4);assert.ok(top.isTop&&top.wavy);}
+        for(let i=1;i<glass.layers.length;i++)close(glass.layers[i].bottom,glass.layers[i-1].top,1e-12);
+      }
+    }
+  }
+});
+
+test('Undo retains a visible same-color surface when the fractional top is below the renderer cutoff',()=>{
+  const model=new StilllightModel();model.board=[[3,3],[3,3,3]];
+  const started=move(model,0,1,T),settled=finishPourAndSettle(model,started),undoAt=settled+50;
+  assert.equal(model.undo(undoAt),true);
+  for(const ms of [0,4,8,10,419,419.9,420]){
+    const frame=model.sample(undoAt+ms);
+    for(const glass of frame.glasses){
+      // Both existing renderers hide sub-epsilon bodies. The visible mass must retain its surface.
+      const visibleTop=glass.layers.filter(layer=>layer.amount>EPSILON).at(-1);
+      assert.ok(visibleTop?.wavy&&visibleTop.surface,'visible same-color surface never disappears');
+      close(presentedArea(visibleTop.surface),canonicalArea(amountOf(glass)),.02);
+    }
   }
 });
 
