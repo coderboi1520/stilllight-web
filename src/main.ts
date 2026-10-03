@@ -15,6 +15,10 @@ import {readHapticsEnabled,writeHapticsEnabled} from './platform/hapticsPreferen
 import {readReducedMotion,writeReducedMotion} from './platform/motionPreference.ts';
 import {presentedPourContact} from './platform/presentedFeedback.ts';
 
+// Do not suspend the entry module: production renderer chunks share its exports.
+// A top-level await here deadlocks their dynamic imports after bundling.
+async function start(){
+let ready=false;
 const host=document.querySelector<HTMLElement>('#pixi-host')!;
 const board=document.querySelector<HTMLElement>('.board')!;
 const query=new URLSearchParams(location.search);
@@ -75,7 +79,7 @@ function renderAt(now:number,advance:boolean,recordMetrics:boolean){
 function schedule(){frameGate.schedule();}
 function invalidateScene(){if(frameGate.isParity()){if(lastPresentedFrame)renderer.render(lastPresentedFrame);return;}if(model.isAnimating())schedule();else renderer.render(model.sample(lastRenderedTime));}
 function choose(i:number){
-  if(frameGate.isParity())return;
+  if(!ready||frameGate.isParity())return;
   const count=model.eventCount;model.choose(i,performance.now());
   if(model.eventCount>count){const event=model.events.at(-1)!;
     if(event.startsWith('selected:')){haptics.trigger('select');status.textContent=`Vessel ${i+1} selected. Choose a destination.`;}
@@ -86,7 +90,7 @@ function choose(i:number){
   updateControls();schedule();
 }
 function action(name:string){
-  if(frameGate.isParity())return;
+  if(!ready||frameGate.isParity())return;
   const now=performance.now();
   if(name==='hint'){model.hint(now);if(model.hintMotion){status.textContent=`Hint: vessel ${model.hintMotion.source+1} to vessel ${model.hintMotion.target+1}.`;haptics.trigger('uiClick');}else status.textContent='No useful pour is available. Undo or restart to recover.';}
   if(name==='undo'&&model.undo(now)){completed=false;status.textContent='Previous pour restored.';haptics.trigger('uiClick');}
@@ -118,4 +122,6 @@ function debugStep(now:number){enterParity();const frame=model.sample(now);rende
 function stats(values:number[]){if(!values.length)return{count:0,mean:0,p95:0,p99:0};const sorted=[...values].sort((a,b)=>a-b),pick=(q:number)=>sorted[Math.min(sorted.length-1,Math.floor((sorted.length-1)*q))];return{count:values.length,mean:values.reduce((a,b)=>a+b,0)/values.length,p95:pick(.95),p99:pick(.99)};}
 (window as any).__STILLLIGHT_PIXI__={action:debugAction,choose:(index:number,now:number)=>{enterParity();model.choose(index,now);},step:debugStep,enterParity,exitParity,isParity:()=>frameGate.isParity(),state:()=>({board:model.board.map(g=>[...g]),selected:model.selected,busy:model.busy}),lastFrame:()=>lastDebugFrame,backend:()=>renderer.backend,metrics:()=>({prep:stats(metrics.prep),render:stats(metrics.render),frameIntervals:stats(metrics.intervals)}),constants:{POUR_MS,UNDO_MS,SELECT_MS,INVALID_MS,SETTLE_MS,HINT_ATTENTION_MS}};
 
-updateControls();renderAt(lastRenderedTime,false,false);
+ready=true;updateControls();renderAt(lastRenderedTime,false,false);
+}
+void start();

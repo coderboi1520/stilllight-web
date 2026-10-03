@@ -34,6 +34,7 @@ The approved artwork is copied unchanged from root `moonlit-studio.png` to `publ
 | `node scripts/verification/verify-ordinary.mjs --feedback` | PASS in both backends: contact exactly once; deliberately skipped contact frame silent |
 | Existing `verify-pour-states.mjs` through the repository browser harness | PASS: two-unit transfer and authored stream boundaries |
 | Existing `capture-parity.mjs` through the repository browser harness, using detected Chromium | 10/10 original/candidate exposed-state comparisons PASS; frame captures retained |
+| `STILLLIGHT_URL=http://127.0.0.1:5180 node scripts/verification/verify-production.mjs` (set the environment variable in the host shell) | PASS in built WebGL and forced Canvas: startup, input during delayed asset initialization, Hint non-mutation, real pointer pour, exact Undo, preference reload, no browser errors; reproduced the entry-module dynamic-import deadlock before its fix |
 | `git diff --check` | PASS |
 
 Full ordinary run observed 13 pour-contact signals, four distinct vessel-completion signals and one final commission-completion signal in each backend. Undo followed by the final pour demonstrated cap removal/re-entry and exact solved-state recovery. Both backends reached zero recurring RAF requests after settling. Visual inspection covered portrait, departure/contact/transfer/return, live stationary Undo, multi-unit pours and completed caps. Initial portrait status clipping and paused-render failure were fixed and affected checks rerun. Final review was performed by the integrator; no extra helper/reviewer was launched.
@@ -50,6 +51,7 @@ NOT RUN: physical vibration/touch, Redmi/Android qualification or native packagi
 - Platform: `src/platform/haptics.ts`, `src/platform/hapticsPreference.ts`, `src/platform/motionPreference.ts`, `src/platform/presentedFeedback.ts`.
 - Debug snapshots: `src/debug/snapshot.ts`.
 - Verification: `tests/ordinary-board.test.mts`, `tests/presented-feedback.test.mts`, `tests/haptics.test.mts`, `tests/haptics-preference.test.mts`, affected Canvas test doubles in `tests/milestone1-regressions.test.mts` and `tests/stage3-1-stream.test.mts`, useful-Hint fixture in `tests/stage3-1-undo.test.mts`, `scripts/verification/verify-ordinary.mjs`, `scripts/verification/verify-parity-freeze.mjs`.
+- Production verification: `scripts/verification/verify-production.mjs`. Production startup runs inside async bootstrap so shared renderer chunks can finish loading; premature input is ignored until initialization completes.
 - This acceptance record. Independent `reference/original`, authored liquid/geometry/timing constants, package manifests and lockfile are unchanged.
 
 ## Preview and next command
