@@ -195,7 +195,7 @@ test('Undo validates current layers and preserves a borrowed manual frame until 
 });
 
 test('Undo waits for home pose during a hint, then accepts a fresh input',()=>{
-  const model=new StilllightModel(),started=move(model,0,1,T);finish(model,started);
+  const model=new StilllightModel([[2,0,3],[3],[1,2],[]]),started=move(model,0,1,T);finish(model,started);
   const hintAt=started+POUR_MS+20;model.hint(hintAt);
   const event=hintAt+115;
   assert.equal(model.undo(event),false);assert.equal(model.undoDepth,1);assert.ok(model.hintMotion);

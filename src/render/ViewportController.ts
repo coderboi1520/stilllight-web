@@ -15,6 +15,6 @@ export class ViewportController{
   constructor(board:HTMLElement,apply:(state:ViewportState)=>void,invalidate:()=>void){this.board=board;this.apply=apply;this.invalidate=invalidate;}
   private bindDprWatcher(){this.dprQuery?.removeEventListener('change',this.dprHandler);const dpr=window.devicePixelRatio||1;this.dprQuery=window.matchMedia(`(resolution: ${dpr}dppx)`);this.dprQuery.addEventListener('change',this.dprHandler);}
   start(){this.observer=new ResizeObserver(this.syncHandler);this.observer.observe(this.board);window.addEventListener('resize',this.syncHandler,{passive:true});this.bindDprWatcher();this.sync();}
-  sync(){const r=this.board.getBoundingClientRect(),state=viewportState(r.width,r.height,window.devicePixelRatio||1),key=`${state.width}x${state.height}@${state.density}`;if(key===this.last)return;this.last=key;this.apply(state);this.invalidate();}
+  sync(){const r=this.board.getBoundingClientRect(),state=viewportState(r.width,r.height,window.devicePixelRatio||1),key=`${state.width}x${state.height}@${state.density}:${r.x},${r.y}:${innerWidth},${innerHeight}`;if(key===this.last)return;this.last=key;this.apply(state);this.invalidate();}
   stop(){this.observer?.disconnect();this.observer=null;window.removeEventListener('resize',this.syncHandler);this.dprQuery?.removeEventListener('change',this.dprHandler);this.dprQuery=null;}
 }

@@ -14,6 +14,7 @@ export function snapshotFrame(frame:RenderFrame){
       contact:snapshotContact(glass.contact),
       response:glass.response?{contact:snapshotContact(glass.response.contact),intensity:glass.response.intensity,spread:glass.response.spread}:null,
       selected:glass.selected,hintRole:glass.hintRole,hintStrength:glass.hintStrength,
+      cap:{...glass.cap},completion:{...glass.completion,particles:glass.completion.particles.map(p=>({...p}))},
       invalid:glass.invalid,invalidStrength:glass.invalidStrength,moving:glass.moving
     })),
     stream:frame.stream?{

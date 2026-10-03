@@ -36,6 +36,8 @@ export async function run(harness) {
       const second = await page.evaluate(() => { const app = window.__STILLLIGHT_PIXI__; return { state: app.state(), frame: app.lastFrame() }; });
       const after = await canvas.screenshot();
       if (JSON.stringify(first) !== JSON.stringify(second) || digest(before) !== digest(after)) {
+        await page.screenshot({path:`${dir}/${label}-after-failure.png`});
+        const fs=await import('node:fs/promises');await fs.writeFile(`${dir}/${label}-before-canvas.png`,before);await fs.writeFile(`${dir}/${label}-after-canvas.png`,after);
         throw new Error(`${label}: presented frame changed on resize invalidation; data=${JSON.stringify(first) === JSON.stringify(second) ? 'stable' : 'changed'}, image=${digest(before) === digest(after) ? 'stable' : 'changed'}`);
       }
       const next = await page.evaluate(now => { const app = window.__STILLLIGHT_PIXI__; app.step(now); return { state: app.state(), frame: app.lastFrame() }; }, presentedAt + 1);
@@ -49,7 +51,7 @@ export async function run(harness) {
       x => x.state.busy && x.frame.glasses.some(g => g.moving),
       x => x.state.busy && x.frame.glasses.some(g => g.moving));
     const hintBefore = await check('hint-before-expiry', 'hint', 1679,
-      x => x.frame.glasses[0].hintRole === 'source' && x.frame.glasses[1].hintRole === 'target' && x.frame.glasses.every(g => g.hintStrength > 0 && g.hintStrength < 1),
+      x => x.frame.glasses[0].hintRole === 'source' && x.frame.glasses[1].hintRole === 'target' && x.frame.glasses.filter(g=>g.hintRole).length===2 && x.frame.glasses.filter(g=>g.hintRole).every(g => g.hintStrength > 0 && g.hintStrength < 1),
       x => x.frame.glasses.every(g => g.hintRole === null && g.hintStrength === 0));
     const hint = await check('hint-expiry', 'hint', 1680,
       x => x.frame.glasses.every(g => g.hintRole === null && g.hintStrength === 0),

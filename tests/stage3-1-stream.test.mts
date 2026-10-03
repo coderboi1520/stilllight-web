@@ -61,7 +61,7 @@ test('stream geometry at an explicit time is independent of sampling cadence',()
 test('Canvas consumes the same vertical control and endpoint geometry from the shared frame',()=>{
   const curves:{cx:number;ex:number}[]=[];
   const ctx={save(){},restore(){},translate(){},rotate(){},setTransform(){},clearRect(){},
-    beginPath(){},moveTo(){},lineTo(){},closePath(){},clip(){},fill(){},stroke(){},fillRect(){},ellipse(){},
+    beginPath(){},moveTo(){},lineTo(){},closePath(){},clip(){},fill(){},stroke(){},fillRect(){},fillText(){},ellipse(){},
     quadraticCurveTo(cx:number,_cy:number,ex:number){curves.push({cx,ex});},
     createLinearGradient(){return{addColorStop(){}};}
   };
