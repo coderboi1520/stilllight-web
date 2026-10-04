@@ -7,7 +7,7 @@ import { HINT_ATTENTION_MS,INVALID_MS,POUR_MS,UNDO_MS,SELECT_MS,SETTLE_MS } from
 import { FrameGate } from './runtime/FrameGate.ts';
 import { snapshotFrame } from './debug/snapshot.ts';
 import {INITIAL,SCENE_TOP_PADDING,H,W} from './core/constants.ts';
-import {ORDINARY_COMMISSION,COLOR_NAMES,COLOR_SYMBOLS} from './core/ordinaryCommission.ts';
+import {ORDINARY_COMMISSION,COLOR_NAMES} from './core/ordinaryCommission.ts';
 import {position} from './core/geometry.ts';
 import {isBottleComplete} from './core/rules.ts';
 import {HapticEngine} from './platform/haptics.ts';
@@ -40,11 +40,9 @@ const glassButtons=initial.map((_,i)=>{
   const p=position(i);b.style.left=`${(p.x/W-.105)*100}%`;b.style.top=`${(p.y+SCENE_TOP_PADDING-8)/H*100}%`;
   b.innerHTML=`<span class="vessel-number" aria-hidden="true">${i+1}</span>`;hits.append(b);b.addEventListener('click',()=>choose(i));return b;
 });
-const legend=document.querySelector('.legend')!;
-COLOR_NAMES.forEach((name,i)=>{const span=document.createElement('span');span.textContent=`${COLOR_SYMBOLS[i]} ${name}`;legend.append(span);});
 function updateControls(){
-  glassButtons.forEach((b,i)=>{const layers=model.board[i];b.setAttribute('aria-label',`Vessel ${i+1}, ${layers.length?`top to bottom: ${[...layers].reverse().map(c=>COLOR_NAMES[c]).join(', ')}`:'empty'}`);b.setAttribute('aria-pressed',String(model.selected===i));b.disabled=model.busy;});
-  control('hint').disabled=model.busy;
+  glassButtons.forEach((b,i)=>{const layers=model.board[i];b.setAttribute('aria-label',`Vessel ${i+1}, ${layers.length?`top to bottom: ${[...layers].reverse().map(c=>COLOR_NAMES[c]).join(', ')}`:'empty'}`);b.setAttribute('aria-pressed',String(model.selected===i));b.disabled=!model.isVesselAvailable(i);});
+  control('hint').disabled=model.busy||!!model.settleMotion;
   control('undo').disabled=!model.canUndo(performance.now());
   for(const [name,on] of [['haptics',hapticsEnabled],['motion',model.reducedMotion]] as const){control(name).setAttribute('aria-pressed',String(on));control(name).querySelector('span')!.textContent=on?'On':'Off';}
 }
@@ -61,12 +59,11 @@ function renderAt(now:number,advance:boolean,recordMetrics:boolean){
   const a=performance.now(),frame=model.sample(now),b=performance.now();renderer.render(frame);lastPresentedFrame=frame;const c=performance.now();lastRenderedTime=now;
   if(recordMetrics){metrics.prep.push(b-a);metrics.render.push(c-b);if(metrics.prep.length>600){metrics.prep.shift();metrics.render.shift();metrics.intervals.shift();}}
   if(advance){
-    const flight=model.flight;
-    if(!frameGate.isParity()&&flight?.kind==='pour'&&presentedPourContact(frame,model.reducedMotion)&&!contactFlights.has(flight)){contactFlights.add(flight);haptics.trigger('pourContact');}
+    for(const flight of model.flights)if(!frameGate.isParity()&&flight.kind==='pour'&&presentedPourContact(frame,model.reducedMotion,flight.id)&&!contactFlights.has(flight)){contactFlights.add(flight);haptics.trigger('pourContact',false,true);}
     const eventCount=model.eventCount,changed=model.advanceAfterFrame(now);
     if(!frameGate.isParity()){
       const events=model.eventCount>eventCount?model.events.slice(-(model.eventCount-eventCount)):[];
-      for(const event of events)if(event.startsWith('cap-contact:'))haptics.trigger('glassComplete');
+      for(const event of events)if(event.startsWith('cap-contact:'))haptics.trigger('glassComplete',false,true);
       const solved=model.board.every(g=>!g.length||isBottleComplete(g));
       if(!solved)completed=false;
       if(solved&&!model.isAnimating()&&!completed){completed=true;status.textContent='Commission complete. Every color is settled.';haptics.trigger('levelComplete');}
@@ -84,7 +81,7 @@ function choose(i:number){
   if(model.eventCount>count){const event=model.events.at(-1)!;
     if(event.startsWith('selected:')){haptics.trigger('select');status.textContent=`Vessel ${i+1} selected. Choose a destination.`;}
     else if(event.startsWith('invalid:')){haptics.trigger('reject');status.textContent='Choose a matching top color or an empty vessel with space.';}
-    else if(event.startsWith('pour-start:'))status.textContent=`Pouring ${model.flight!.amount} ${COLOR_NAMES[model.flight!.color]} ${model.flight!.amount===1?'unit':'units'} into vessel ${i+1}.`;
+    else if(event.startsWith('pour-start:')){const flight=model.flights.at(-1)!;status.textContent=`Pouring ${flight.amount} ${COLOR_NAMES[flight.color]} ${flight.amount===1?'unit':'units'} into vessel ${i+1}.`;}
     else status.textContent='Selection cleared.';
   }
   updateControls();schedule();

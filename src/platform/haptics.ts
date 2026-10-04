@@ -57,11 +57,13 @@ export class HapticEngine {
     this.enabled = enabled;
   }
 
-  trigger(kind: HapticKind, force = false): void {
+  // The presenter deduplicates transaction/cap events; a shared time throttle
+  // must not discard a different vessel's concurrent contact.
+  trigger(kind: HapticKind, force = false, deduplicated = false): void {
     if (!this.enabled && !force) return;
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
     const last = this.lastAt.get(kind) ?? -Infinity;
-    if (now - last < THROTTLE_MS[kind]) return;
+    if (!deduplicated && now - last < THROTTLE_MS[kind]) return;
     this.lastAt.set(kind, now);
     try {
       void Promise.resolve(this.backend.perform(kind)).catch(() => undefined);

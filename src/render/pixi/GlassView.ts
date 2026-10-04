@@ -35,14 +35,6 @@ function outline(wall:string,wallWidth:number,rim:string,rimWidth:number){
   return g;
 }
 
-function symbolContexts(){
-  const diamond=new GraphicsContext().moveTo(0,-4).lineTo(4,0).lineTo(0,4).lineTo(-4,0).closePath().fill('#10212b');
-  const circle=new GraphicsContext().circle(0,0,3).fill('#10212b');
-  const waves=new GraphicsContext();for(const y of [-3,0,3])waves.moveTo(-5,y).bezierCurveTo(-2,y-3,2,y+3,5,y);waves.stroke({color:'#10212b',width:1.3});
-  const star=new GraphicsContext().moveTo(0,-5).lineTo(1.4,-1.4).lineTo(5,0).lineTo(1.4,1.4).lineTo(0,5).lineTo(-1.4,1.4).lineTo(-5,0).lineTo(-1.4,-1.4).closePath().fill('#10212b');
-  return[diamond,circle,waves,star];
-}
-
 export class GlassView{
   root=new Container();
   private shadowTexture=makeBodyShadowTexture();
@@ -69,8 +61,6 @@ export class GlassView{
   private glowList:Sprite[]=[];
   private ownedTextures:Texture[]=[this.shadowTexture,this.baseTexture,this.reflectionTexture,this.edgeTexture,this.rimTexture];
   private destroyed=false;
-  private symbolShapes=symbolContexts();
-  private symbols=Array.from({length:5},()=>new Graphics(this.symbolShapes[0]));
 
   constructor(capTexture:Texture){
     this.capBody.texture=capTexture;
@@ -103,7 +93,7 @@ export class GlassView{
     this.clipped.addChild(this.liquid.root,this.baseDepth,this.reflection,this.edgeHighlight);
     this.clipped.mask=this.clip;
     for(let i=0;i<12;i++){const particle=i<8?new Graphics().circle(0,0,1.7).fill({color:0xffffff,alpha:.16}).circle(0,0,.75).fill(0xffffff):new Graphics().circle(0,0,1).stroke({color:0xffffff,width:.45});particle.visible=false;this.particles.push(particle);}
-    this.root.addChild(this.shadow,this.body,this.clip,this.clipped,...this.glowList,this.normal,this.normalRim,this.selected,this.invalid,...this.symbols,this.cap,...this.particles);
+    this.root.addChild(this.shadow,this.body,this.clip,this.clipped,...this.glowList,this.normal,this.normalRim,this.selected,this.invalid,this.cap,...this.particles);
     this.selected.visible=this.invalid.visible=false;
   }
 
@@ -112,7 +102,6 @@ export class GlassView{
     this.destroyed=true;
     this.liquid.destroy();
     this.root.destroy({children:true});
-    for(const shape of this.symbolShapes)shape.destroy();
     for(const texture of this.ownedTextures)texture.destroy(true);
     this.ownedTextures.length=0;
   }
@@ -133,13 +122,6 @@ export class GlassView{
     }
     this.reflection.x=-34+Math.max(-2,Math.min(2,-Math.sin(frame.pose.angle)*2));
     this.liquid.update(frame);
-    for(let i=0;i<this.symbols.length;i++){
-      const symbol=this.symbols[i],layer=frame.layers[i];symbol.visible=!!layer&&layer.amount>=.6&&Math.abs(frame.pose.angle)<.05;
-      if(!symbol.visible)continue;
-      symbol.context=this.symbolShapes[layer.color];
-      const y=(layer.top+layer.bottom)/2,a=frame.relativeLiquidRotation;
-      symbol.position.set(-y*Math.sin(a),y*Math.cos(a));symbol.rotation=a;
-    }
     for(const g of this.glowList)g.visible=false;
     const normalVisible=!frame.invalid&&!frame.selected;
     this.normal.visible=normalVisible;

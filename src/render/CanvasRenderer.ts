@@ -1,7 +1,6 @@
 import { COLORS,COMPLETION_ACCENTS,GLASS_BOTTOM,H,SCENE_TOP_PADDING,W } from '../core/constants.ts';
 import type {GlassFrame,LiquidLayerFrame,RenderFrame,StreamFrame} from '../core/RenderFrame.ts';
 import {CAP_ART_SCALE,CAP_ART_WIDTH,CAP_SOURCE_BOTTOM} from './capArtwork.ts';
-import {COLOR_SYMBOLS} from '../core/ordinaryCommission.ts';
 import {backdropLayout} from './sceneBackdrop.ts';
 
 const DEPTH_COLORS=COLORS.map(color=>`#${[1,3,5].map(at=>Math.round(parseInt(color.slice(at,at+2),16)*.87).toString(16).padStart(2,'0')).join('')}`);
@@ -41,8 +40,6 @@ export class CanvasRenderer{
     ctx.save();ctx.shadowColor='#000';ctx.shadowBlur=7;ctx.fillStyle='rgba(12,31,42,.78)';closedGlassPath(ctx);ctx.fill();ctx.restore();
     ctx.save();closedGlassPath(ctx);ctx.clip();
     ctx.save();ctx.rotate(frame.relativeLiquidRotation);for(let i=0;i<frame.layers.length;i++){const layer=frame.layers[i],next=frame.layers[i+1];this.layer(ctx,layer,!next||next.color!==layer.color);}
-    ctx.fillStyle='#10212b';ctx.font='bold 13px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
-    for(const layer of frame.layers)if(layer.amount>=.6&&Math.abs(frame.pose.angle)<.05)ctx.fillText(COLOR_SYMBOLS[layer.color],0,(layer.top+layer.bottom)/2);
     if(frame.response){const {local,tangent}=frame.response.contact,intensity=frame.response.intensity;ctx.save();ctx.translate(local.x,local.y);ctx.rotate(Math.atan2(tangent.y,tangent.x));ctx.strokeStyle='#fff';ctx.lineWidth=.9;ctx.globalAlpha=.14*intensity;ctx.beginPath();ctx.ellipse(0,.6,frame.response.spread,2.1,0,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#fff';ctx.globalAlpha=.22*intensity;ctx.beginPath();ctx.ellipse(0,0,3.2,1.1,0,0,Math.PI*2);ctx.fill();ctx.restore();}
     ctx.restore();
     const shine=ctx.createLinearGradient(-34,0,34,0);shine.addColorStop(0,'#ffffff38');shine.addColorStop(.18,'#ffffff07');shine.addColorStop(.86,'#ffffff00');shine.addColorStop(1,'#ffffff34');ctx.fillStyle=shine;ctx.fillRect(-34,0,68,158);
@@ -70,6 +67,8 @@ export class CanvasRenderer{
     const ctx=this.ctx,sx=this.width/W,sy=this.height/H;ctx.setTransform(this.density,0,0,this.density,0,0);ctx.clearRect(0,0,this.width,this.height);ctx.fillStyle='#071219';ctx.fillRect(0,0,this.width,this.height);
     if(this.backdrop&&this.backdropImage){const b=this.backdrop;ctx.drawImage(this.backdropImage,b.x,b.y,b.width,b.height);ctx.fillStyle='rgba(0,0,0,.333333)';ctx.fillRect(0,0,this.width,this.height);}
     ctx.setTransform(this.density*sx,0,0,this.density*sy,0,0);ctx.translate(0,SCENE_TOP_PADDING);
-    const moving=frame.glasses.find(g=>g.moving);for(const glass of frame.glasses)if(glass!==moving)this.glass(glass);if(moving)this.glass(moving);this.stream(frame.stream);
+    for(const glass of frame.glasses)if(!glass.moving)this.glass(glass);
+    for(const glass of frame.glasses)if(glass.moving)this.glass(glass);
+    for(const stream of frame.streams)this.stream(stream);
   }
 }

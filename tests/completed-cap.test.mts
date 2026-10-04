@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {StilllightModel} from '../src/core/model.ts';
-import {CAPACITY,POUR_MS,UNDO_MS} from '../src/core/constants.ts';
+import {CAPACITY,POUR_MS,SETTLE_MS,UNDO_MS} from '../src/core/constants.ts';
 import {isBottleComplete} from '../src/core/rules.ts';
 
 const T=10000;
@@ -41,7 +41,7 @@ test('Undo removes a completed cap and reset clears an active cap motion',()=>{
   const model=new StilllightModel();model.board=[[3],[3,3,3]];
   assert.equal(model.startPour(T),true);
   model.sample(T+POUR_MS);model.advanceAfterFrame(T+POUR_MS);
-  const undoAt=T+POUR_MS+300;
+  const undoAt=T+POUR_MS+SETTLE_MS;model.sample(undoAt);model.advanceAfterFrame(undoAt);
   assert.equal(model.undo(undoAt),true);
   assert.equal(at(model,undoAt).visible,true);
   assert.equal(model.sample(undoAt).glasses[1].completion.particles.some(p=>p.visible),false);
@@ -53,17 +53,20 @@ test('Undo removes a completed cap and reset clears an active cap motion',()=>{
   assert.deepEqual(model.board,[[2,0,3],[3]]);
 });
 
-test('Undo during landing begins removal from the presented cap pose',()=>{
+test('Undo waits through landing recovery then removes the cap from its presented pose',()=>{
   const model=new StilllightModel();model.board=[[3],[3,3,3]];
   model.startPour(T);model.sample(T+POUR_MS);model.advanceAfterFrame(T+POUR_MS);
-  const undoAt=T+POUR_MS+40,before=at(model,undoAt);
-  assert.equal(model.undo(undoAt),true);
-  assert.deepEqual(at(model,undoAt),before);
+  const landingAt=T+POUR_MS+40,before=at(model,landingAt);
+  assert.equal(model.undo(landingAt),false);assert.equal(model.undoDepth,1);
+  assert.deepEqual(at(model,landingAt),before);
+  const undoAt=T+POUR_MS+SETTLE_MS;model.sample(undoAt);model.advanceAfterFrame(undoAt);
+  const recovered=at(model,undoAt);assert.equal(model.undo(undoAt),true);
+  assert.deepEqual(at(model,undoAt),recovered);
   assert.equal(at(model,undoAt+125).visible,false);
 });
 
 test('refined Undo clears completion effects and reaches idle before completing again',()=>{
-  for(const delay of [40,250,1000]){
+  for(const delay of [SETTLE_MS,550,1000]){
     const model=new StilllightModel(),original=[[3],[3,3,3]];
     model.board=original.map(glass=>[...glass]);
     let started=T;
@@ -155,10 +158,11 @@ test('dev preview leaves subsequent pour and Undo history valid',()=>{
   assert.ok(model.flight);assert.equal(model.undoDepth,1);
   const end=T+301+POUR_MS;model.sample(end);model.advanceAfterFrame(end);
   assert.equal(at(model,end,1).visible,false);
-  assert.equal(model.undo(end+100),true);
+  const undoAt=end+SETTLE_MS;model.sample(undoAt);model.advanceAfterFrame(undoAt);
+  assert.equal(model.undo(undoAt),true);
   assert.deepEqual(model.board,[[2,0,3],[3,3,3,3]]);
-  model.sample(end+100+UNDO_MS);model.advanceAfterFrame(end+100+UNDO_MS);
-  assert.equal(at(model,end+100+UNDO_MS,1).visible,true);
+  model.sample(undoAt+UNDO_MS);model.advanceAfterFrame(undoAt+UNDO_MS);
+  assert.equal(at(model,undoAt+UNDO_MS,1).visible,true);
 });
 
 test('renderers retain a glass-local pumpkin cap under one rigid body',()=>{

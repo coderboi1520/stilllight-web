@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {StilllightModel} from '../src/core/model.ts';
-import {POUR_MS,STREAM_END,TRANSFER_END} from '../src/core/constants.ts';
+import {POUR_MS,SETTLE_MS,STREAM_END,TRANSFER_END} from '../src/core/constants.ts';
 import {pourDirection,pouringLip,streamControl} from '../src/core/geometry.ts';
 import {CanvasRenderer} from '../src/render/CanvasRenderer.ts';
 
@@ -76,7 +76,7 @@ test('Canvas consumes the same vertical control and endpoint geometry from the s
     for(const curve of streamCurves){close(curve.cx,stream.start.x);close(curve.ex,stream.end.x);}
     curves.length=0;
     model.sample(T+POUR_MS);model.advanceAfterFrame(T+POUR_MS);
-    const undoAt=T+POUR_MS+50;assert.equal(model.undo(undoAt),true);
+    const undoAt=T+POUR_MS+SETTLE_MS+50;model.advanceAfterFrame(undoAt);assert.equal(model.undo(undoAt),true);
     new CanvasRenderer().render(model.sample(undoAt+260));
     assert.equal(curves.filter(curve=>curve.cx>100).length,0,'Canvas renders no Undo stream');
   }finally{if(previousDocument===undefined)delete globalThis.document;else globalThis.document=previousDocument;}

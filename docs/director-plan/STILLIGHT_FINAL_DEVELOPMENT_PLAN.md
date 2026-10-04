@@ -1,5 +1,11 @@
 # Stilllight final development plan
 
+## Owner scope addendum — 2026-10-04
+
+This dated owner direction supersedes conflicting historical phase/next-command text below. **Lightwork is CANCELLED**, including ordered delivery wells and requests. Other new gameplay mechanics and modes are **ON HOLD**. Concurrent ordinary pouring (PF03) is the owner's explicit correction and is exempt from that hold. The owner rejects always-on liquid symbols and the associated color-symbol legend (PF02); no replacement ornamentation is authorized.
+
+The authorized Ordinary Fix Run is limited to PF01 keyboard focus, PF02 marker/legend removal, PF03 independent concurrent ordinary pours, and their necessary regressions. One local implementer in `D:\STILLLIGHT`, worktree OFF, no subagents/reviewer chats; scoped tests, coherent commits, safe main integration and normal GitHub push are authorized. Stop at the delivered build for owner gameplay/appearance playtesting. Do not automatically launch P1.2, P1.3 save/Continue, P2 Home/restoration, campaign, audio expansion, Android packaging, or another stage. Earlier ratification and acceptance records remain provenance, not authorization for cancelled or held work.
+
 **FINAL DIRECTOR RATIFIED — 2026-10-03.** Frozen development direction; amendments require an explicit recorded director decision. See the [ratification record](<C:/Users/itsjo/Documents/Codex/2026-09-08/read-the-handoff-package-carefully-and/outputs/ChromaFlasks_Project/master-product-plan/ASTRA_FINAL_DIRECTOR_RATIFICATION_20261003.md>). P0 still requires authorization.
 
 2026-10-03 — implementation-ready program; **not implementation authorization**. No P0 work has started. This plan operationalizes the accepted product direction and the four independent-audit corrections. It does not introduce a second vision.

@@ -11,7 +11,7 @@ const volume=(board:readonly (readonly number[])[])=>board.reduce((total,glass)=
 const colors=(board:readonly (readonly number[])[])=>board.flat().sort((a,b)=>a-b);
 const shown=(model:StilllightModel,now:number)=>model.sample(now).glasses.map(glass=>glass.layers.reduce((total,layer)=>total+layer.amount,0));
 function move(model:StilllightModel,source:number,target:number,now:number){model.choose(source,now);model.choose(target,now+1);assert.ok(model.flight);return now+1;}
-function finish(model:StilllightModel,started:number){model.sample(started+POUR_MS);model.advanceAfterFrame(started+POUR_MS);assert.equal(model.busy,false);}
+function finish(model:StilllightModel,started:number){model.sample(started+POUR_MS);model.advanceAfterFrame(started+POUR_MS);assert.equal(model.busy,false);model.sample(started+POUR_MS+SETTLE_MS);model.advanceAfterFrame(started+POUR_MS+SETTLE_MS);}
 function finishUndo(model:StilllightModel,started:number){model.sample(started+UNDO_MS);model.advanceAfterFrame(started+UNDO_MS);assert.equal(model.busy,false);}
 
 test('successful moves create one bounded history entry while empty, invalid, and reset paths do not',()=>{
@@ -19,14 +19,14 @@ test('successful moves create one bounded history entry while empty, invalid, an
   assert.equal(model.undo(T),false);assert.equal(model.undoDepth,0);assert.strictEqual(model.events,events);
   const started=move(model,0,1,T);assert.equal(model.undoDepth,1);
   finish(model,started);
-  model.choose(0,started+POUR_MS+10);model.choose(1,started+POUR_MS+11);
+  model.choose(0,started+POUR_MS+SETTLE_MS+10);model.choose(1,started+POUR_MS+SETTLE_MS+11);
   assert.ok(model.invalidMotion);assert.equal(model.undoDepth,1);
-  assert.equal(model.undo(started+POUR_MS+12),false);assert.equal(model.undoDepth,1);
+  assert.equal(model.undo(started+POUR_MS+SETTLE_MS+12),false);assert.equal(model.undoDepth,1);
   model.reset();assert.equal(model.undoDepth,0);assert.equal(model.undo(T+5000),false);
 
   const bounded=new StilllightModel();bounded.board=[[1],[]];
   for(let i=0;i<66;i++){
-    const source=i%2,target=1-source,at=T+i*(POUR_MS+20);
+    const source=i%2,target=1-source,at=T+i*(POUR_MS+SETTLE_MS+20);
     const start=move(bounded,source,target,at);finish(bounded,start);
   }
   assert.equal(bounded.undoDepth,64);
@@ -47,7 +47,7 @@ test('Undo restores exact layers and conserved colors for single, merged, partia
     const after=model.board.map(glass=>[...glass]);
     assert.equal(volume(after),volume(original));assert.deepEqual(colors(after),colors(original));
     finish(model,started);
-    const undoAt=started+POUR_MS+80;
+    const undoAt=started+POUR_MS+SETTLE_MS+80;
     assert.equal(model.undo(undoAt),true);assert.equal(model.undoDepth,0);
     assert.deepEqual(model.board,original,'logical board commits once on accepted Undo');
     assert.deepEqual(model.sample(undoAt).board,original);
@@ -74,7 +74,7 @@ test('Undo restores exact layers and conserved colors for single, merged, partia
 
 test('Undo restores fill in place over 520 ms with no stream, vessel motion, or terminal fill speed',()=>{
   const model=new StilllightModel(),started=move(model,0,1,T);finish(model,started);
-  const undoAt=started+POUR_MS+100;
+  const undoAt=started+POUR_MS+SETTLE_MS+100;
   const before=model.sample(undoAt).glasses.map(glass=>({angle:glass.surfaceAngle,wave:glass.wave,phase:glass.phase}));
   assert.equal(model.undo(undoAt),true);
   assert.equal(UNDO_MS,520);
@@ -168,9 +168,9 @@ test('busy Undo is ignored, blocks interactions, and repeated fresh Undo pops on
   const first=move(model,0,1,T);
   assert.equal(model.undo(first+100),false);assert.equal(model.undoDepth,1);
   finish(model,first);
-  const second=move(model,1,0,first+POUR_MS+20);finish(model,second);
+  const second=move(model,1,0,first+POUR_MS+SETTLE_MS+20);finish(model,second);
   assert.equal(model.undoDepth,2);assert.deepEqual(model.board,[[1],[]]);
-  const undoAt=second+POUR_MS+20;assert.equal(model.undo(undoAt),true);assert.equal(model.undoDepth,1);
+  const undoAt=second+POUR_MS+SETTLE_MS+20;assert.equal(model.undo(undoAt),true);assert.equal(model.undoDepth,1);
   const eventCount=model.events.length;
   assert.equal(model.undo(undoAt+200),false);model.choose(0,undoAt+200);model.hint(undoAt+200);model.invalid(undoAt+200);
   assert.equal(model.startPour(undoAt+200),false);
@@ -185,7 +185,7 @@ test('busy Undo is ignored, blocks interactions, and repeated fresh Undo pops on
 
 test('Undo validates current layers and preserves a borrowed manual frame until the next explicit sample',()=>{
   const model=new StilllightModel(),started=move(model,0,1,T);finish(model,started);
-  const at=started+POUR_MS+50,borrowed=model.sample(at),frozen=snapshotFrame(borrowed);
+  const at=started+POUR_MS+SETTLE_MS+50,borrowed=model.sample(at),frozen=snapshotFrame(borrowed);
   const expected=model.board.map(glass=>[...glass]);model.board[1][0]=99;
   assert.equal(model.undo(at),false);assert.equal(model.undoDepth,1);
   model.board=expected;
@@ -196,7 +196,7 @@ test('Undo validates current layers and preserves a borrowed manual frame until 
 
 test('Undo waits for home pose during a hint, then accepts a fresh input',()=>{
   const model=new StilllightModel([[2,0,3],[3],[1,2],[]]),started=move(model,0,1,T);finish(model,started);
-  const hintAt=started+POUR_MS+20;model.hint(hintAt);
+  const hintAt=started+POUR_MS+SETTLE_MS+20;model.hint(hintAt);
   const event=hintAt+115;
   assert.equal(model.undo(event),false);assert.equal(model.undoDepth,1);assert.ok(model.hintMotion);
   const at=hintAt+680;

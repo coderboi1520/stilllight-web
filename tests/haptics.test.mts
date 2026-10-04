@@ -46,6 +46,18 @@ test('throttles each kind independently and accepts events at the exact boundary
   });
 });
 
+test('distinct already-deduplicated presentation events survive the shared time throttle and respect Off',()=>{
+  withNow(setNow=>{
+    const calls:HapticKind[]=[];
+    const engine=new HapticEngine(true,{perform:kind=>{calls.push(kind);}});
+    engine.trigger('pourContact',false,true);setNow(20);engine.trigger('pourContact',false,true);
+    engine.trigger('glassComplete',false,true);engine.trigger('glassComplete',false,true);
+    assert.deepEqual(calls,['pourContact','pourContact','glassComplete','glassComplete']);
+    engine.setEnabled(false);engine.trigger('pourContact',false,true);engine.trigger('glassComplete',false,true);
+    assert.equal(calls.length,4);
+  });
+});
+
 test('tolerates missing browser vibration support', () => {
   const original = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
   Object.defineProperty(globalThis, 'navigator', {configurable: true, value: {}});

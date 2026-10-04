@@ -4,9 +4,9 @@ import { liquidLevel,liquidTop,sampleAreaPreservingSurface,sampleSurface } from 
 import {prepareSurfaceContact} from './contact.ts';
 import {clone,isBottleComplete,pour} from './rules.ts';
 import {CAP_ENTER_MS,CAP_EXIT_MS,CAP_FIRST_IMPACT_MS,COMPLETION_FX_MS,completionWaveAt,sampleCap,sampleCompletion,type CapMotion,type CompletionMotion} from './capMotion.ts';
-import type {GlassFrame,LiquidLayerFrame,ReceiverResponseFrame,RenderFrame,StreamFrame} from './RenderFrame.ts';
+import type {FlightFrame,GlassFrame,LiquidLayerFrame,ReceiverResponseFrame,RenderFrame,StreamFrame} from './RenderFrame.ts';
 
-type Flight={source:number;target:number;before:number[][];amount:number;color:number;started:number;kind:'pour'|'undo'};
+type Flight={id:number;source:number;target:number;before:number[][];amount:number;color:number;started:number;kind:'pour'|'undo';presentation:FlightFrame;stream:StreamFrame};
 type MoveHistory={source:number;target:number;color:number;amount:number;beforeSource:readonly number[];beforeTarget:readonly number[];afterSource:readonly number[];afterTarget:readonly number[]};
 type Invalid={source:number;target:number;direction:number;started:number};
 type Pulse={index:number;started:number};
@@ -82,18 +82,22 @@ function correctionVelocity(offset:number,velocity:number,elapsed:number,duratio
 const makeLayer=():LiquidLayerFrame=>({color:0,amount:0,bottom:0,top:0,isTop:false,wavy:false,surface:new Float64Array(SURFACE_SAMPLES*2)});
 const makeGlassFrame=(index:number):GlassFrame=>({index,pose:{x:0,y:0,angle:0},surfaceAngle:0,relativeLiquidRotation:0,wave:0,phase:0,dynamicLiquid:false,layers:[],contact:{local:{x:0,y:0},world:{x:0,y:0},tangent:{x:1,y:0},empty:true},response:null,cap:{visible:false,alpha:1,y:1,scaleX:1,scaleY:1,rotation:0},completion:{recoilY:0,color:0,particles:Array.from({length:12},()=>({visible:false,x:0,y:0,radius:0,alpha:0,bubble:false}))},selected:false,hintRole:null,hintStrength:0,invalid:false,invalidStrength:0,moving:false});
 const makeSurfaceState=():SurfaceState=>({angle:0,wave:0,phase:0});
-const makeStreamFrame=():StreamFrame=>({visible:true,color:0,alpha:0,reveal:0,widthScale:1,start:{x:0,y:0},control:{x:0,y:0},end:{x:0,y:0}});
+const makeStreamFrame=():StreamFrame=>({id:0,source:0,target:0,visible:true,color:0,alpha:0,reveal:0,widthScale:1,start:{x:0,y:0},control:{x:0,y:0},end:{x:0,y:0}});
 const makeEventKinematics=():EventKinematics=>({pose:{x:0,y:0,angle:0},velocity:{x:0,y:0,angle:0}});
 
 export class StilllightModel{
   board=clone(INITIAL);
   private boardFrame=clone(INITIAL);
   selected:number|null=null;
-  busy=false;
-  flight:Flight|null=null;
+  private activeFlights:Flight[]=[];
+  private settlingPairs:Settle[]=[];
+  private nextFlightId=1;
+  get flights():readonly Flight[]{return this.activeFlights;}
+  get flight():Flight|null{return this.activeFlights[0]??null;}
+  get settleMotion():Settle|null{return this.settlingPairs[0]??null;}
+  get busy(){return this.activeFlights.length>0||!!this.invalidMotion;}
   invalidMotion:Invalid|null=null;
   selectionPulse:Pulse|null=null;
-  settleMotion:Settle|null=null;
   hintMotion:Hint|null=null;
   invalidSource:number|null=null;
   invalidTarget:number|null=null;
@@ -103,9 +107,8 @@ export class StilllightModel{
 
   private layerSlots=[[makeLayer(),makeLayer(),makeLayer(),makeLayer(),makeLayer()],[makeLayer(),makeLayer(),makeLayer(),makeLayer(),makeLayer()]];
   private glassFrames:GlassFrame[]=[makeGlassFrame(0),makeGlassFrame(1)];
-  private receiverResponse:ReceiverResponseFrame={contact:this.glassFrames[1].contact,intensity:0,spread:0};
-  private streamFrame=makeStreamFrame();
-  private frame:RenderFrame={now:0,board:this.boardFrame,glasses:this.glassFrames,stream:null,events:this.events,metrics:{pourProgress:0,transfer:0,settleProgress:0}};
+  private receiverResponses:ReceiverResponseFrame[]=[];
+  private frame:RenderFrame={now:0,board:this.boardFrame,glasses:this.glassFrames,flights:[],streams:[],stream:null,events:this.events,metrics:{pourProgress:0,transfer:0,settleProgress:0}};
   private poseCorrections:(PoseCorrection|null)[]=[null,null];
   private surfaceCorrections:(SurfaceCorrection|null)[]=[null,null];
   private surfaceStates:(SurfaceState)[]=[makeSurfaceState(),makeSurfaceState()];
@@ -132,13 +135,27 @@ export class StilllightModel{
     this.surfaceStates=initial.map(makeSurfaceState);this.surfaceCaptures=initial.map(makeSurfaceState);this.surfaceVelocities=initial.map(makeSurfaceState);
     this.eventKinematics=initial.map(makeEventKinematics);
     this.capComplete=initial.map(isBottleComplete);this.capMotions=initial.map(()=>null);this.completionMotions=initial.map(()=>null);
-    this.frame.glasses=this.glassFrames;this.receiverResponse.contact=this.glassFrames[0].contact;
+    this.frame.glasses=this.glassFrames;
+    this.receiverResponses=this.glassFrames.map(g=>({contact:g.contact,intensity:0,spread:0}));
   }
 
   get undoDepth(){return this.moveHistory.length;}
 
+  private flightFor(index:number){return this.activeFlights.find(f=>f.source===index||f.target===index)??null;}
+  private settleFor(index:number){return this.settlingPairs.find(s=>s.source===index||s.target===index)??null;}
+  isVesselAvailable(index:number){
+    return Number.isInteger(index)&&!!this.board[index]&&!this.activeFlights.some(f=>f.kind==='undo')&&
+      !this.flightFor(index)&&!this.settleFor(index)&&
+      !(this.invalidMotion&&(index===this.invalidMotion.source||index===this.invalidMotion.target));
+  }
+  private acceptFlight(source:number,target:number,before:number[][],amount:number,color:number,started:number,kind:'pour'|'undo'){
+    const id=this.nextFlightId++,stream=makeStreamFrame();Object.assign(stream,{id,source,target});
+    const presentation:FlightFrame={id,source,target,kind,progress:0,transfer:0,stream:null};
+    this.activeFlights.push({id,source,target,before,amount,color,started,kind,presentation,stream});
+  }
+
   canUndo(now:number){
-    const entry=this.moveHistory.at(-1);if(this.busy||this.flight||this.invalidMotion||!entry||!this.historyMatches(entry))return false;
+    const entry=this.moveHistory.at(-1);if(this.busy||this.settleMotion||!entry||!this.historyMatches(entry))return false;
     for(let i=0;i<this.board.length;i++){
       const home=position(i),pose=this.poseAt(i,now,this.targetPose),v=this.velocityAt(i,now,this.targetVelocity);
       if(Math.abs(pose.x-home.x)+Math.abs(pose.y-home.y)+Math.abs(pose.angle)+Math.abs(v.x)+Math.abs(v.y)+Math.abs(v.angle)>1e-7)return false;
@@ -146,8 +163,8 @@ export class StilllightModel{
     return true;
   }
 
-  private transitionCaps(before:readonly (readonly number[])[],after:readonly (readonly number[])[],now:number,entry:boolean){
-    for(let index=0;index<this.board.length;index++){
+  private transitionCaps(before:readonly (readonly number[])[],after:readonly (readonly number[])[],now:number,entry:boolean,indices:readonly number[]=this.board.map((_,i)=>i)){
+    for(const index of indices){
       const was=isBottleComplete(before[index]),next=isBottleComplete(after[index]);
       if(entry){if(!was&&next){this.capComplete[index]=true;this.capMotions[index]={kind:'enter',started:now};this.completionMotions[index]={impactAt:now+CAP_FIRST_IMPACT_MS,color:after[index][0],recorded:false};}}
       else if(was&&!next){const from=sampleCap(this.capComplete[index],this.capMotions[index],now,{visible:false,alpha:1,y:1,scaleX:1,scaleY:1,rotation:0});this.capComplete[index]=false;this.capMotions[index]={kind:'exit',started:now,from};this.completionMotions[index]=null;}
@@ -169,6 +186,7 @@ export class StilllightModel{
   private continueClearedOthers(except:number[],now:number,hint:Hint|null,settle:Settle|null){for(let i=0;i<this.board.length;i++)if(!except.includes(i))this.continueClearedPartner(i,now,hint,settle); }
 
   private continueClearedPartner(index:number,now:number,hint:Hint|null,settle:Settle|null){
+    if(this.flightFor(index)||this.settleFor(index))return;
     const duration=Math.max(hint?DESELECT_RETURN_MS:0,settle?Math.max(0,settle.started+SETTLE_MS-now):0);
     if(duration<=0)return;
     this.velocityAt(index,now,this.targetVelocity,false);
@@ -200,7 +218,7 @@ export class StilllightModel{
 
   private poseAt(index:number,now:number,out:Pose,includeCorrection=true){
     if(this.reducedMotion){position(index,out);out.angle=0;return out;}
-    const active=this.flight,invalid=this.invalidMotion,pulse=this.selectionPulse,hint=this.hintMotion;
+    const active=this.flightFor(index),invalid=this.invalidMotion,pulse=this.selectionPulse,hint=this.hintMotion;
     const progress=active?clamp01((now-active.started)/POUR_MS):0,transfer=active?transferAt(progress):0,invalidProgress=invalid?clamp01((now-invalid.started)/INVALID_MS):0,pulseProgress=pulse?clamp01((now-pulse.started)/SELECT_MS):0;
     const moving=active?.kind==='pour'&&active.source===index;
     position(index,out);out.angle=0;
@@ -215,7 +233,7 @@ export class StilllightModel{
   private velocityAt(index:number,now:number,out:Pose,includeCorrection=true){
     zeroPose(out);
     if(this.reducedMotion)return out;
-    const active=this.flight,invalid=this.invalidMotion,pulse=this.selectionPulse,hint=this.hintMotion,moving=active?.kind==='pour'&&active.source===index;
+    const active=this.flightFor(index),invalid=this.invalidMotion?.source===index?this.invalidMotion:null,pulse=this.selectionPulse,hint=this.hintMotion,moving=active?.kind==='pour'&&active.source===index;
     if(!active&&!invalid&&this.selected===index&&pulse?.index===index){const raw=(now-pulse.started)/SELECT_MS;if(raw>=0&&raw<1){selectedPoseDerivative(raw,out);out.y/=SELECT_MS;}}
     if(!moving&&!invalid&&hint)out.y-=(hint.source===index?1.8:hint.target===index?1.2:0)*hintStrengthVelocity(hint,index,now);
     if(includeCorrection)this.applyCorrectionVelocity(index,now,out);
@@ -224,7 +242,7 @@ export class StilllightModel{
 
   private surfaceAt(index:number,now:number,out:SurfaceState,includeCorrection=true){
     if(this.reducedMotion){out.angle=0;out.wave=0;out.phase=now*.018;return out;}
-    const active=this.flight,invalid=this.invalidMotion,pulse=this.selectionPulse,settle=this.settleMotion;
+    const active=this.flightFor(index),invalid=this.invalidMotion,pulse=this.selectionPulse,settle=this.settleFor(index);
     out.angle=0;out.wave=0;out.phase=now*.018;
     if(active?.kind==='pour')flightSurface(active,index,now,out);
     else if(active?.kind==='undo')undoSurface(active,index,now,out);
@@ -277,7 +295,7 @@ export class StilllightModel{
     this.poseCorrections[index]={started:now,duration,dx,dy,da,dvx,dvy,dva};
   }
 
-  reset(){this.board=clone(this.initial);this.boardFrame=clone(this.board);this.selected=null;this.busy=false;this.flight=this.invalidMotion=this.selectionPulse=this.settleMotion=this.hintMotion=null;this.invalidSource=this.invalidTarget=null;this.poseCorrections.fill(null);this.surfaceCorrections.fill(null);this.capComplete=this.board.map(isBottleComplete);this.capMotions.fill(null);this.completionMotions.fill(null);this.moveHistory.length=0;this.events=['reset'];}
+  reset(){this.board=clone(this.initial);this.boardFrame=clone(this.board);this.selected=null;this.activeFlights.length=0;this.settlingPairs.length=0;this.invalidMotion=this.selectionPulse=this.hintMotion=null;this.invalidSource=this.invalidTarget=null;this.poseCorrections.fill(null);this.surfaceCorrections.fill(null);this.capComplete=this.board.map(isBottleComplete);this.capMotions.fill(null);this.completionMotions.fill(null);this.moveHistory.length=0;this.events=['reset'];}
 
   previewCompletedRight(now:number){
     this.reset();
@@ -287,15 +305,15 @@ export class StilllightModel{
   }
 
   choose(index:number,now:number){
-    if(!Number.isInteger(index)||!this.board[index]||this.flight||this.invalidMotion||this.busy)return;
+    if(!this.isVesselAvailable(index))return;
     const source=this.selected;
     if(source===null){
       if(this.board[index].length){
-        const hint=this.hintMotion,settle=this.settleMotion;
+        const hint=this.hintMotion;
         this.capturePair(now);
-        this.settleMotion=null;this.selected=index;this.selectionPulse={index,started:now};this.hintMotion=null;
+        this.selected=index;this.selectionPulse={index,started:now};this.hintMotion=null;
         this.velocityAt(index,now,this.targetVelocity,false);this.beginCorrection(index,now,SELECT_MS,this.targetVelocity);
-        this.continueClearedOthers([index],now,hint,settle);
+        this.continueClearedOthers([index],now,hint,null);
         this.record(`selected:${index}`);
       }
       return;
@@ -303,29 +321,29 @@ export class StilllightModel{
     if(source===index){this.capturePresented(source,now);this.selected=null;this.selectionPulse=null;this.velocityAt(source,now,this.targetVelocity,false);this.beginCorrection(source,now,DESELECT_RETURN_MS,this.targetVelocity);this.record('selection-cleared');return;}
     const result=pour(this.board,source,index);
     if(!result){
-      const direction=position(index).x>=position(source).x?1:-1,hint=this.hintMotion,settle=this.settleMotion;
+      if(this.invalidMotion)return;
+      const direction=position(index).x>=position(source).x?1:-1,hint=this.hintMotion;
       this.capturePair(now);
-      this.selected=null;this.selectionPulse=null;this.settleMotion=null;this.hintMotion=null;
-      this.invalidSource=source;this.invalidTarget=index;this.invalidMotion={source,target:index,direction,started:now};this.busy=true;
+      this.selected=null;this.selectionPulse=null;this.hintMotion=null;
+      this.invalidSource=source;this.invalidTarget=index;this.invalidMotion={source,target:index,direction,started:now};
       zeroPose(this.targetVelocity);this.beginCorrection(source,now,INVALID_MS,this.targetVelocity);
-      this.continueClearedOthers([source],now,hint,settle);
+      this.continueClearedOthers([source],now,hint,null);
       this.record(`invalid:${source}->${index}`);return;
     }
-    const settle=this.settleMotion,hint=this.hintMotion;
+    const hint=this.hintMotion;
     this.capturePair(now);
     const before=clone(this.board);
-    this.selected=null;this.selectionPulse=null;this.settleMotion=null;this.invalidSource=this.invalidTarget=null;
-    this.flight={source,target:index,before,amount:result.amount,color:result.color,started:now,kind:'pour'};
-    this.board=result.board;this.boardFrame=clone(this.board);this.busy=true;this.transitionCaps(before,this.board,now,false);
+    this.selected=null;this.selectionPulse=null;
+    this.acceptFlight(source,index,before,result.amount,result.color,now,'pour');
+    this.board=result.board;this.boardFrame=clone(this.board);this.transitionCaps(before,this.board,now,false,[source,index]);
     this.rememberMove(source,index,result.color,result.amount,before,this.board);
     zeroPose(this.targetVelocity);this.beginCorrection(source,now,DEPARTURE_BLEND_MS,this.targetVelocity);
-    if(settle)this.beginSurfaceCorrection(index,now,DEPARTURE_BLEND_MS);
-    this.continueClearedOthers([source,index],now,hint,settle);
+    this.continueClearedOthers([source,index],now,hint,null);
     this.record(`pour-start:${source}->${index}`);
   }
 
   undo(now:number){
-    if(this.busy||this.flight||this.invalidMotion)return false;
+    if(this.busy||this.settleMotion)return false;
     const entry=this.moveHistory.at(-1);
     if(!entry||!this.historyMatches(entry))return false;
     this.capturePair(now);
@@ -338,10 +356,10 @@ export class StilllightModel{
     const restored=clone(this.board);
     restored[entry.source]=[...entry.beforeSource];restored[entry.target]=[...entry.beforeTarget];
     this.moveHistory.pop();
-    this.selected=null;this.selectionPulse=null;this.settleMotion=null;this.hintMotion=null;
+    this.selected=null;this.selectionPulse=null;this.hintMotion=null;
     this.invalidSource=this.invalidTarget=null;
-    this.flight={source:entry.target,target:entry.source,before,amount:entry.amount,color:entry.color,started:now,kind:'undo'};
-    this.board=restored;this.boardFrame=clone(restored);this.busy=true;this.transitionCaps(before,restored,now,false);
+    this.acceptFlight(entry.target,entry.source,before,entry.amount,entry.color,now,'undo');
+    this.board=restored;this.boardFrame=clone(restored);this.transitionCaps(before,restored,now,false);
     this.poseCorrections.fill(null);
     for(let i=0;i<this.board.length;i++)this.beginSurfaceCorrection(i,now,UNDO_MS);
     this.record(`undo-start:${entry.target}->${entry.source}`);
@@ -349,7 +367,7 @@ export class StilllightModel{
   }
 
   hint(now:number){
-    if(this.busy||this.hintMotion&&now-this.hintMotion.started<HINT_ATTENTION_MS)return;
+    if(this.busy||this.settleMotion||this.hintMotion&&now-this.hintMotion.started<HINT_ATTENTION_MS)return;
     let pair:Hint|null=null,best=-Infinity;
     for(let source=0;source<this.board.length;source++)for(let target=0;target<this.board.length;target++){
       if(isBottleComplete(this.board[source]))continue;
@@ -365,7 +383,8 @@ export class StilllightModel{
     if(this.busy)return;
     const selected=this.selected,hint=this.hintMotion;
     this.capturePair(now);
-    this.selected=null;this.selectionPulse=null;this.hintMotion=null;this.invalidSource=0;this.invalidTarget=1;this.invalidMotion={source:0,target:1,direction:1,started:now};this.busy=true;
+    if(!this.isVesselAvailable(0)||!this.isVesselAvailable(1))return;
+    this.selected=null;this.selectionPulse=null;this.hintMotion=null;this.invalidSource=0;this.invalidTarget=1;this.invalidMotion={source:0,target:1,direction:1,started:now};
     zeroPose(this.targetVelocity);this.beginCorrection(0,now,INVALID_MS,this.targetVelocity);
     if(selected!==null&&selected!==0){this.velocityAt(selected,now,this.targetVelocity,false);this.beginCorrection(selected,now,DESELECT_RETURN_MS,this.targetVelocity);}
     else this.continueClearedPartner(1,now,hint,null);
@@ -373,13 +392,12 @@ export class StilllightModel{
   }
 
   startPour(now:number){
-    if(this.busy)return false;const result=pour(this.board,0,1);if(!result)return false;
-    const selected=this.selected,settle=this.settleMotion;this.capturePair(now);
-    const before=clone(this.board);this.flight={source:0,target:1,before,amount:result.amount,color:result.color,started:now,kind:'pour'};this.board=result.board;this.boardFrame=clone(this.board);this.selected=null;this.busy=true;this.settleMotion=null;this.transitionCaps(before,this.board,now,false);
+    if(!this.isVesselAvailable(0)||!this.isVesselAvailable(1))return false;const result=pour(this.board,0,1);if(!result)return false;
+    const selected=this.selected;this.capturePair(now);
+    const before=clone(this.board);this.acceptFlight(0,1,before,result.amount,result.color,now,'pour');this.board=result.board;this.boardFrame=clone(this.board);this.selected=null;this.transitionCaps(before,this.board,now,false,[0,1]);
     this.rememberMove(0,1,result.color,result.amount,before,this.board);
     zeroPose(this.targetVelocity);this.beginCorrection(0,now,DEPARTURE_BLEND_MS,this.targetVelocity);
     if(selected!==null&&selected!==0){this.velocityAt(selected,now,this.targetVelocity,false);this.beginCorrection(selected,now,DESELECT_RETURN_MS,this.targetVelocity);}
-    else if(settle)this.beginSurfaceCorrection(1,now,DEPARTURE_BLEND_MS);
     this.record('pour-start:0->1');return true;
   }
 
@@ -388,6 +406,9 @@ export class StilllightModel{
     const progress=active?clamp01((now-active.started)/(active.kind==='undo'?UNDO_MS:POUR_MS)):0,transfer=active?(active.kind==='undo'?undoTransferAt(progress):transferAt(progress)):0,invalidProgress=invalid?clamp01((now-invalid.started)/INVALID_MS):0,settleProgress=settling?clamp01((now-settling.started)/SETTLE_MS):0,activeDirection=active?pourDirection(active.source,active.target):1;
 
     const makeGlass=(index:number,moving=false)=>{
+      const active=this.flightFor(index);
+      const progress=active?clamp01((now-active.started)/(active.kind==='undo'?UNDO_MS:POUR_MS)):0;
+      const transfer=active?(active.kind==='undo'?undoTransferAt(progress):transferAt(progress)):0;
       const frame=this.glassFrames[index];
       this.poseAt(index,now,frame.pose,true);
       const surface=this.surfaceAt(index,now,this.surfaceStates[index]);
@@ -429,55 +450,66 @@ export class StilllightModel{
     };
 
     const glasses=this.glassFrames;
-    for(let i=0;i<this.board.length;i++){makeGlass(i,active?.kind==='pour'&&active.source===i);prepareSurfaceContact(glasses[i],i%3===0?-1:1,glasses[i].contact);}
-    if(active?.kind==='pour'){
+    for(let i=0;i<this.board.length;i++){const owned=this.flightFor(i);makeGlass(i,owned?.kind==='pour'&&owned.source===i);prepareSurfaceContact(glasses[i],i%3===0?-1:1,glasses[i].contact);}
+    for(const glass of glasses)glass.response=null;
+    const frame=this.frame;frame.streams.length=0;frame.flights.length=0;
+    for(const active of this.activeFlights){
+      const progress=clamp01((now-active.started)/(active.kind==='undo'?UNDO_MS:POUR_MS));
+      const transfer=active.kind==='undo'?undoTransferAt(progress):transferAt(progress);
+      const activeDirection=pourDirection(active.source,active.target);
+      const presentation=active.presentation;presentation.progress=progress;presentation.transfer=transfer;presentation.stream=null;
+      frame.flights.push(presentation);
+    if(active.kind==='pour'){
       const receiver=glasses[active.target];
       const impactX=progress>STREAM_START&&progress<STREAM_END?
-        pouringLip(glasses[active.source].pose,activeDirection,this.streamFrame.start).x:receiver.pose.x;
+        pouringLip(glasses[active.source].pose,activeDirection,active.stream.start).x:receiver.pose.x;
       prepareSurfaceContact(receiver,activeDirection,receiver.contact,impactX);
     }
-    for(const glass of glasses)glass.response=null;
     let stream:StreamFrame|null=null;
     let responseIntensity=0;
     if(active?.kind==='pour'&&progress>STREAM_START&&progress<1){
       const receiver=glasses[active.target],contact=receiver.contact;
       responseIntensity=receiverResponseAt(progress);
       if(responseIntensity>0){
-        const response=this.receiverResponse;response.contact=contact;response.intensity=responseIntensity;
+        const response=this.receiverResponses[active.target];response.contact=contact;response.intensity=responseIntensity;
         response.spread=7+12*smoother((progress-TRANSFER_START)/.50);
         receiver.response=response;
       }
     }
     if(!this.reducedMotion&&active?.kind==='pour'&&progress>STREAM_START&&progress<STREAM_END){
       const moving=glasses[active.source],contact=glasses[active.target].contact,direction=activeDirection,q=clamp01((progress-STREAM_START)/(STREAM_END-STREAM_START));
-      stream=this.streamFrame;pouringLip(moving.pose,direction,stream.start);
+      stream=active.stream;pouringLip(moving.pose,direction,stream.start);
       stream.end.x=contact.world.x;stream.end.y=contact.world.y;
       streamControl(stream.start,stream.end,direction,stream.control);
       stream.visible=true;stream.color=active.color;stream.alpha=Math.max(0,Math.min(1,q*7,(1-q)*7));
       stream.reveal=smoother((progress-STREAM_START)/(TRANSFER_START-STREAM_START));
       stream.widthScale=1-.65*smoother((progress-TRANSFER_END)/(STREAM_END-TRANSFER_END));
+      presentation.stream=stream;frame.streams.push(stream);
     }
-    const frame=this.frame;frame.now=now;frame.board=this.boardFrame;frame.stream=stream;frame.events=this.events;frame.metrics.pourProgress=progress;frame.metrics.transfer=transfer;frame.metrics.settleProgress=settleProgress;
+    }
+    frame.now=now;frame.board=this.boardFrame;frame.stream=frame.flights[0]?.stream??null;frame.events=this.events;frame.metrics.pourProgress=progress;frame.metrics.transfer=transfer;frame.metrics.settleProgress=settleProgress;
     return frame;
   }
 
   advanceAfterFrame(now:number){
-    let active=this.flight,changed=false;
-    if(active&&clamp01((now-active.started)/(active.kind==='undo'?UNDO_MS:POUR_MS))>=1){
+    let changed=false;
+    for(let i=0;i<this.activeFlights.length;){
+      const active=this.activeFlights[i];
+      if(clamp01((now-active.started)/(active.kind==='undo'?UNDO_MS:POUR_MS))<1){i++;continue;}
       const source=this.surfaceAt(active.source,now,this.surfaceStates[active.source]);
       const target=this.surfaceAt(active.target,now,this.surfaceStates[active.target]);
-      this.flight=null;this.busy=false;
-      this.transitionCaps(active.before,this.board,now,true);
+      this.activeFlights.splice(i,1);
+      this.transitionCaps(active.before,this.board,now,true,[active.source,active.target]);
       if(active.kind==='undo')this.record('undo-complete');
       else{
-        this.settleMotion={source:active.source,target:active.target,started:now,surfaces:this.surfaceStates.map((state,i)=>({... (i===active.source?source:i===active.target?target:state)}))};
+        this.settlingPairs.push({source:active.source,target:active.target,started:now,surfaces:this.surfaceStates.map((state,i)=>({... (i===active.source?source:i===active.target?target:state)}))});
         this.record('pour-complete','settle-start');
       }
       changed=true;
     }
-    const invalid=this.invalidMotion;if(invalid&&clamp01((now-invalid.started)/INVALID_MS)>=1){this.invalidMotion=null;this.invalidSource=this.invalidTarget=null;this.busy=false;this.record('invalid-complete');changed=true;}
+    const invalid=this.invalidMotion;if(invalid&&clamp01((now-invalid.started)/INVALID_MS)>=1){this.invalidMotion=null;this.invalidSource=this.invalidTarget=null;this.record('invalid-complete');changed=true;}
     const pulse=this.selectionPulse;if(pulse&&clamp01((now-pulse.started)/SELECT_MS)>=1){this.selectionPulse=null;this.record('selection-complete');changed=true;}
-    const settle=this.settleMotion;if(!this.flight&&settle&&clamp01((now-settle.started)/SETTLE_MS)>=1){this.settleMotion=null;this.record('settle-complete');changed=true;}
+    for(let i=0;i<this.settlingPairs.length;){const settle=this.settlingPairs[i];if(now-settle.started>=SETTLE_MS){this.settlingPairs.splice(i,1);this.record('settle-complete');changed=true;}else i++;}
     const hint=this.hintMotion;if(hint&&clamp01((now-hint.started)/HINT_ATTENTION_MS)>=1){this.hintMotion=null;this.record('hint-complete');changed=true;}
     for(let i=0;i<this.poseCorrections.length;i++){const correction=this.poseCorrections[i];if(correction&&now-correction.started>=correction.duration){this.poseCorrections[i]=null;changed=true;}}
     for(let i=0;i<this.surfaceCorrections.length;i++){const correction=this.surfaceCorrections[i];if(correction&&now-correction.started>=correction.duration){this.surfaceCorrections[i]=null;changed=true;}}

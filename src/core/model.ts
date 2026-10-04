@@ -46,9 +46,9 @@ export class StilllightModel extends BaseStilllightModel{
   }
 
   override advanceAfterFrame(now:number){
-    const wasUndo=this.flight?.kind==='undo';
+    const wasUndo=this.flights.some(flight=>flight.kind==='undo');
     const changed=super.advanceAfterFrame(now);
-    if(this.undoSurfaceOwnership&&!this.flight&&!this.settleMotion)this.undoSurfaceOwnership=false;
+    if(this.undoSurfaceOwnership&&!this.flights.length&&!this.settleMotion)this.undoSurfaceOwnership=false;
     else if(wasUndo)this.undoSurfaceOwnership=true;
     return changed;
   }

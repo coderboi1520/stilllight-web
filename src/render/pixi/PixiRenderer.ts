@@ -12,10 +12,10 @@ export class PixiRenderer{
   app=new Application();
   private scene=new Container();
   private glasses:GlassView[]|null=null;
-  private stream:StreamView|null=null;
+  private streams:StreamView[]=[];
   private retiredViews:(GlassView|StreamView)[]=[];
   private initialized=false;
-  private movingIndex=-2;
+  private movingOrder='';
   private density=1;
   private capTexture:Texture|null=null;
   private backdrop:Sprite|null=null;
@@ -49,14 +49,16 @@ export class PixiRenderer{
   }
 
   private rebuildViews(force:boolean){
-    if(this.glasses&&this.stream&&!force)return;
+    if(this.glasses&&!force)return;
     if(this.glasses){
       this.scene.removeChildren();
       this.retiredViews.push(...this.glasses);
-      if(this.stream)this.retiredViews.push(this.stream);
+      this.retiredViews.push(...this.streams);
     }
     if(!this.capTexture)throw new Error('Pumpkin cap texture unavailable');
-    this.glasses=Array.from({length:this.vesselCount},()=>new GlassView(this.capTexture!));this.stream=new StreamView();this.scene.addChild(...this.glasses.map(g=>g.root),this.stream.root);this.movingIndex=-2;
+    this.glasses=Array.from({length:this.vesselCount},()=>new GlassView(this.capTexture!));
+    this.streams=Array.from({length:Math.floor(this.vesselCount/2)},()=>new StreamView());
+    this.scene.addChild(...this.glasses.map(g=>g.root),...this.streams.map(s=>s.root));this.movingOrder='';
   }
 
   private destroyRetiredViews(){for(const view of this.retiredViews)view.destroy();this.retiredViews.length=0;}
@@ -70,20 +72,21 @@ export class PixiRenderer{
     if(this.backdrop&&this.host){const layout=backdropLayout(this.host,width,height,this.backdrop.texture.width,this.backdrop.texture.height);this.backdrop.visible=!!layout;if(layout){this.backdrop.position.set(layout.x,layout.y);this.backdrop.width=layout.width;this.backdrop.height=layout.height;}}
   }
 
-  private ensureDrawOrder(movingIndex:number){
-    if(this.movingIndex===movingIndex||!this.glasses||!this.stream)return;
-    this.movingIndex=movingIndex;
+  private ensureDrawOrder(frame:RenderFrame){
+    const movingOrder=frame.glasses.map(g=>g.moving?'1':'0').join('');
+    if(this.movingOrder===movingOrder||!this.glasses)return;
+    this.movingOrder=movingOrder;
     let order=0;
-    for(let i=0;i<this.glasses.length;i++)if(i!==movingIndex)this.scene.setChildIndex(this.glasses[i].root,order++);
-    if(movingIndex>=0)this.scene.setChildIndex(this.glasses[movingIndex].root,order);
-    this.scene.setChildIndex(this.stream.root,this.glasses.length);
+    for(let i=0;i<this.glasses.length;i++)if(!frame.glasses[i].moving)this.scene.setChildIndex(this.glasses[i].root,order++);
+    for(let i=0;i<this.glasses.length;i++)if(frame.glasses[i].moving)this.scene.setChildIndex(this.glasses[i].root,order++);
+    for(const stream of this.streams)this.scene.setChildIndex(stream.root,order++);
   }
 
   render(frame:RenderFrame){
-    if(!this.initialized||!this.glasses||!this.stream)return;
+    if(!this.initialized||!this.glasses)return;
     for(let i=0;i<this.glasses.length;i++)this.glasses[i].update(frame.glasses[i]);
-    const movingIndex=frame.glasses.findIndex(g=>g.moving);this.ensureDrawOrder(movingIndex);this.stream.update(frame.stream);this.app.renderer.render(this.app.stage);this.destroyRetiredViews();
+    this.ensureDrawOrder(frame);for(let i=0;i<this.streams.length;i++)this.streams[i].update(frame.streams[i]??null);this.app.renderer.render(this.app.stage);this.destroyRetiredViews();
   }
 
-  destroy(){this.app.canvas?.removeEventListener('webglcontextrestored',this.restoreHandler);this.glasses?.forEach(view=>view.destroy());this.stream?.destroy();this.glasses=null;this.stream=null;this.destroyRetiredViews();try{this.app.destroy(true,{children:true});}catch{}this.initialized=false;}
+  destroy(){this.app.canvas?.removeEventListener('webglcontextrestored',this.restoreHandler);this.glasses?.forEach(view=>view.destroy());this.streams.forEach(view=>view.destroy());this.glasses=null;this.streams.length=0;this.destroyRetiredViews();try{this.app.destroy(true,{children:true});}catch{}this.initialized=false;}
 }
