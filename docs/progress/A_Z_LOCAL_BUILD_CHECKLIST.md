@@ -14,7 +14,7 @@ Authority: owner's continuous-run command supersedes old phase stops, Home props
 - [x] Silent capability boundary: preserve audio/haptic modules/preferences; no runtime dispatch.
 - [x] Truthful payment/video/2x/Premium/Ultimate/Remove Ads/leaderboard/history previews; reachable Help/About/Privacy/Terms/feedback/reset.
 - [x] Verification: meaningful domain tests; full build/unit; actual portraits 400×889, 450×1000, 400×778, both backends; input/idle/recovery/parallel checks; representative screenshots.
-- [ ] Final review, WORK_STATE/director/acceptance updates; coherent intended commits; safe main integration and normal push verified; usable built local preview; owner playtest pending.
+- [x] Final review, WORK_STATE/director/acceptance updates; coherent intended commits; safe main integration and normal push verified; usable built local preview; owner playtest pending.
 
 ## Decisions / resume ledger
 - Ruling: retain all three legacy IDs and exact six-vessel initial boards. New tutorial receives a new ID. v1 migration waives tutorial and retains active history and awards; legacy progression unlock is mapped explicitly. Cost: returning players may visit previously unplayed earlier entries freely; they receive no invented clears.
@@ -24,8 +24,10 @@ Authority: owner's continuous-run command supersedes old phase stops, Home props
 
 Implementation order: content/trace and state tests → content/product/session → tutorial/renderer/capability → shell/material/cosmetics → runtime verification/fixes → acceptance/integration.
 
-Checkpoint: implementation and final source/visual review complete. 139 tests pass; build, six campaign portrait/backend checks, product and Journey/album checks on both backends, existing smoke, five runtime scenarios and built production checks pass. Built preview http://127.0.0.1:5182. Acceptance/current guidance updated. Scoped Git integration/push is the remaining delivery action; owner end-to-end acceptance remains pending. Resume with the acceptance record; do not repeat completed implementation.
+Checkpoint: implementation and final source/visual review complete. 139 tests pass; build, six campaign portrait/backend checks, product and Journey/album checks on both backends, existing smoke, five runtime scenarios and built production checks pass. Built preview http://127.0.0.1:5182. Acceptance/current guidance updated. Scoped implementation ecf367e and acceptance 9ce5c2e fast-forwarded into main. Integrated suite 139/139; normal push and fetched origin/main plus ls-remote all matched 9ce5c2ee04d8806ee5ef66a34ccb6b36f56706ef. Preview HTTP 200. Owner end-to-end acceptance remains pending. Resume with the acceptance record; do not repeat completed implementation.
 
 - Ruling: inherited dense ma-moon-in-glass is level 10, closing chapter one. Explicit v1 unlock floor maps the legacy next level; no intermediate clears are fabricated. Regression covers continuing to levels 11 and 12 without forcing tutorial.
 - Ruling: retain a bounded Pixi glass-view pool while only actual board/frame/buttons contain 3/4/5/6 active glasses. Recreating smaller view generations exposed retired mesh callbacks at chapter Next; reuse removes that transition hazard while existing DPR retirement/context contracts stay intact.
 - Ruling: owner limits reviewer scope to small Luna helpers, so full source/visual/integration review is by the sole Sol owner; one Luna Low helper checks mechanical routes/placeholders only.
+
+Delivery ledger: original three artwork/engine contracts retained; only scoped product/docs/evidence committed. Unrelated artifacts remain untracked and preserved. Final documentation-ledger commit follows the verified product push; exact latest remote identity is reported in the final handoff.
