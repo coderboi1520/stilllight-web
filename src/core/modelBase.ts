@@ -5,6 +5,7 @@ import {prepareSurfaceContact} from './contact.ts';
 import {clone,isBottleComplete,pour} from './rules.ts';
 import {CAP_ENTER_MS,CAP_EXIT_MS,CAP_FIRST_IMPACT_MS,COMPLETION_FX_MS,completionWaveAt,sampleCap,sampleCompletion,type CapMotion,type CompletionMotion} from './capMotion.ts';
 import type {FlightFrame,GlassFrame,LiquidLayerFrame,ReceiverResponseFrame,RenderFrame,StreamFrame} from './RenderFrame.ts';
+import {validateModelState,type ModelState} from './modelState.ts';
 
 type Flight={id:number;source:number;target:number;before:number[][];amount:number;color:number;started:number;kind:'pour'|'undo';presentation:FlightFrame;stream:StreamFrame};
 type MoveHistory={source:number;target:number;color:number;amount:number;beforeSource:readonly number[];beforeTarget:readonly number[];afterSource:readonly number[];afterTarget:readonly number[]};
@@ -121,6 +122,7 @@ export class StilllightModel{
   private targetPose:Pose={x:0,y:0,angle:0};
   private targetVelocity:Pose={x:0,y:0,angle:0};
   private moveHistory:MoveHistory[]=[];
+  private acceptedHistory:MoveHistory[]=[];
   private capComplete:(boolean)[]=[isBottleComplete(INITIAL[0]),isBottleComplete(INITIAL[1])];
   private capMotions:(CapMotion|null)[]=[null,null];
   private completionMotions:(CompletionMotion|null)[]=[null,null];
@@ -140,6 +142,21 @@ export class StilllightModel{
   }
 
   get undoDepth(){return this.moveHistory.length;}
+
+  exportState():ModelState{return structuredClone({board:this.board,history:this.acceptedHistory});}
+  restoreState(value:unknown){
+    const state=validateModelState(value,this.initial);
+    this.reset();this.board=state.board;this.boardFrame=clone(state.board);this.acceptedHistory=state.history;this.moveHistory=state.history.slice(-UNDO_HISTORY_LIMIT);
+    this.capComplete=this.board.map(isBottleComplete);
+  }
+
+  showHint(source:number,target:number,now:number){
+    if(this.busy||this.settleMotion||!pour(this.board,source,target))return false;
+    this.capturePair(now);const selected=this.selected;
+    this.selected=null;this.selectionPulse=null;this.hintMotion={source,target,started:now};
+    if(selected!==null){this.velocityAt(selected,now,this.targetVelocity,false);this.beginCorrection(selected,now,DESELECT_RETURN_MS,this.targetVelocity);}
+    this.record('hint-start');return true;
+  }
 
   private flightFor(index:number){return this.activeFlights.find(f=>f.source===index||f.target===index)??null;}
   private settleFor(index:number){return this.settlingPairs.find(s=>s.source===index||s.target===index)??null;}
@@ -178,7 +195,7 @@ export class StilllightModel{
       beforeSource:Object.freeze([...before[source]]),beforeTarget:Object.freeze([...before[target]]),
       afterSource:Object.freeze([...after[source]]),afterTarget:Object.freeze([...after[target]])});
     if(this.moveHistory.length===UNDO_HISTORY_LIMIT)this.moveHistory.shift();
-    this.moveHistory.push(entry);
+    this.moveHistory.push(entry);this.acceptedHistory.push(entry);
   }
 
   private capturePair(now:number){for(let i=0;i<this.board.length;i++)this.capturePresented(i,now);}
@@ -295,7 +312,7 @@ export class StilllightModel{
     this.poseCorrections[index]={started:now,duration,dx,dy,da,dvx,dvy,dva};
   }
 
-  reset(){this.board=clone(this.initial);this.boardFrame=clone(this.board);this.selected=null;this.activeFlights.length=0;this.settlingPairs.length=0;this.invalidMotion=this.selectionPulse=this.hintMotion=null;this.invalidSource=this.invalidTarget=null;this.poseCorrections.fill(null);this.surfaceCorrections.fill(null);this.capComplete=this.board.map(isBottleComplete);this.capMotions.fill(null);this.completionMotions.fill(null);this.moveHistory.length=0;this.events=['reset'];}
+  reset(){this.board=clone(this.initial);this.boardFrame=clone(this.board);this.selected=null;this.activeFlights.length=0;this.settlingPairs.length=0;this.invalidMotion=this.selectionPulse=this.hintMotion=null;this.invalidSource=this.invalidTarget=null;this.poseCorrections.fill(null);this.surfaceCorrections.fill(null);this.capComplete=this.board.map(isBottleComplete);this.capMotions.fill(null);this.completionMotions.fill(null);this.moveHistory.length=0;this.acceptedHistory.length=0;this.events=['reset'];}
 
   previewCompletedRight(now:number){
     this.reset();
@@ -356,6 +373,7 @@ export class StilllightModel{
     const restored=clone(this.board);
     restored[entry.source]=[...entry.beforeSource];restored[entry.target]=[...entry.beforeTarget];
     this.moveHistory.pop();
+    this.acceptedHistory.pop();
     this.selected=null;this.selectionPulse=null;this.hintMotion=null;
     this.invalidSource=this.invalidTarget=null;
     this.acceptFlight(entry.target,entry.source,before,entry.amount,entry.color,now,'undo');
