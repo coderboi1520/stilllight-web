@@ -6,6 +6,7 @@ import {restorationArtwork} from './restoration.ts';
 import {drawInteriorGlassPath,makeGlassArtwork} from './glassMaterial.ts';
 import {makeVesselNumbers,NUMBER_HEIGHT,NUMBER_WIDTH,vesselNumberLayout} from './vesselNumbers.ts';
 import {workbenchProps,type Presentation} from './workbench.ts';
+import {tintedArtwork} from './tintedArtwork.ts';
 
 const DEPTH_COLORS=COLORS.map(color=>`#${[1,3,5].map(at=>Math.round(parseInt(color.slice(at,at+2),16)*.87).toString(16).padStart(2,'0')).join('')}`);
 
@@ -28,6 +29,9 @@ export class CanvasRenderer{
   private restoration=0;
   private restorationAlpha=1;
   private presentation:Presentation='game';
+  private capTint='#ffffff';
+  private glassTint='#ffffff';
+  setFinishes(cap:string,glass:string){this.capTint=cap;this.glassTint=glass;}
   setPresentation(mode:Presentation){this.presentation=mode;}
   setRestoration(count:number,alpha=1){this.restoration=count;this.restorationAlpha=alpha;}
 
@@ -54,14 +58,14 @@ export class CanvasRenderer{
     if(frame.response){const {local,tangent}=frame.response.contact,intensity=frame.response.intensity;ctx.save();ctx.translate(local.x,local.y);ctx.rotate(Math.atan2(tangent.y,tangent.x));ctx.strokeStyle='#fff';ctx.lineWidth=.9;ctx.globalAlpha=.14*intensity;ctx.beginPath();ctx.ellipse(0,.6,frame.response.spread,2.1,0,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#fff';ctx.globalAlpha=.22*intensity;ctx.beginPath();ctx.ellipse(0,0,3.2,1.1,0,0,Math.PI*2);ctx.fill();ctx.restore();}
     ctx.restore();
     ctx.drawImage(this.glassArtwork.base,-34,0,68,158);
-    ctx.drawImage(this.glassArtwork.reflection,-34+Math.max(-2,Math.min(2,-Math.sin(frame.pose.angle)*2)),0,68,158);
-    ctx.drawImage(this.glassArtwork.edge,-34,0,68,158);
+    ctx.drawImage(tintedArtwork(this.glassArtwork.reflection,this.glassTint),-34+Math.max(-2,Math.min(2,-Math.sin(frame.pose.angle)*2)),0,68,158);
+    ctx.drawImage(tintedArtwork(this.glassArtwork.edge,this.glassTint),-34,0,68,158);
     ctx.restore();
     const glow=frame.invalid?'#ff8e94':frame.hintRole==='source'?'#f5d38e':frame.hintRole==='target'?'#83e0d4':frame.selected?'#f5d38e':null;
     if(glow){ctx.save();ctx.globalAlpha=frame.invalid?.55*frame.invalidStrength:frame.hintRole?frame.hintStrength:1;ctx.shadowColor=glow;ctx.shadowBlur=frame.invalid?12:16;outline(ctx,glow,frame.invalid?3:2.4,glow,frame.invalid?3:2.4);ctx.restore();}
     if(frame.invalid){ctx.save();ctx.globalAlpha=.65*frame.invalidStrength;outline(ctx,'#ff8e94',3,'#ffb0b5',1.4);ctx.restore();}else if(frame.selected)outline(ctx,'#f5d38e',1.6,'#f9e1ae',1.8);else{ctx.strokeStyle='#b9d8e66f';ctx.lineWidth=1.25;openGlassPath(ctx);ctx.stroke();ctx.drawImage(this.glassArtwork.rim,-90,-36,180,230);}
     if(frame.cap.visible&&this.capImage){ctx.save();ctx.translate(0,frame.cap.y);ctx.rotate(frame.cap.rotation);ctx.scale(frame.cap.scaleX,frame.cap.scaleY);ctx.globalAlpha=frame.cap.alpha;
-      ctx.drawImage(this.capImage,-CAP_ART_WIDTH/2,-CAP_SOURCE_BOTTOM*CAP_ART_SCALE,CAP_ART_WIDTH,CAP_ART_WIDTH);
+      ctx.drawImage(tintedArtwork(this.capImage,this.capTint,this.capTint!=='#ffffff'),-CAP_ART_WIDTH/2,-CAP_SOURCE_BOTTOM*CAP_ART_SCALE,CAP_ART_WIDTH,CAP_ART_WIDTH);
       ctx.restore();}
     for(const p of frame.completion.particles){if(!p.visible)continue;ctx.save();ctx.beginPath();ctx.arc(p.x,p.y,p.radius,0,Math.PI*2);if(p.bubble){ctx.globalAlpha=p.alpha;ctx.strokeStyle='#e9f7ff';ctx.lineWidth=.8;ctx.stroke();}else{ctx.fillStyle=COMPLETION_ACCENTS[frame.completion.color];ctx.globalAlpha=p.alpha*.16;ctx.beginPath();ctx.arc(p.x,p.y,p.radius*1.7,0,Math.PI*2);ctx.fill();ctx.globalAlpha=p.alpha;ctx.beginPath();ctx.arc(p.x,p.y,p.radius*.75,0,Math.PI*2);ctx.fill();}ctx.restore();}
     ctx.restore();

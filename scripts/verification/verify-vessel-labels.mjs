@@ -15,7 +15,11 @@ await withVerificationHarness({},async h=>{
    return Array.from({length:6},(_,i)=>{
     const x=(80+i%3*120)*c.width/400,y=(130+Math.floor(i/3)*242+20-8+620*.28)*c.height/620;
     const pixels=ctx.getImageData(Math.round(x-5*c.width/r.width),Math.round(y),Math.round(10*c.width/r.width),Math.round(14*c.height/r.height)).data;
-    let count=0;for(let p=0;p<pixels.length;p+=4)if(pixels[p]>200&&pixels[p+1]>185&&pixels[p+2]>155&&pixels[p]>=pixels[p+1]&&pixels[p+1]>=pixels[p+2])count++;
+    // Fixed 12px glyphs now land on fractional pixels at the narrower mobile
+    // board sizes. Include their antialiased ivory edges, retaining the same
+    // visibility and natural occlusion assertions rather than counting only
+    // near-opaque glyph cores.
+    let count=0;for(let p=0;p<pixels.length;p+=4)if(pixels[p]>175&&pixels[p+1]>160&&pixels[p+2]>135&&pixels[p]>=pixels[p+1]&&pixels[p+1]>=pixels[p+2])count++;
     return count;
    });
   },time);

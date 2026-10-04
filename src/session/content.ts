@@ -1,9 +1,11 @@
-import {ORDINARY_COMMISSION} from '../core/ordinaryCommission.ts';
+import {CAMPAIGN_BOARDS} from './campaignBoards.ts';
 export const ROOM={id:'moonlit-atelier',name:'Moonlit Atelier'};
-export type Commission={id:string;name:string;teaching:string;contribution:string;board:number[][]};
-export const COMMISSIONS:readonly Commission[]=[
- {id:'ma-first-light',name:'First light',teaching:'Choose a vessel, then a matching top or an empty vessel. Each pour moves the whole matching run that fits.',contribution:'The left lily pane transmits moonlight.',board:[[0,0,1,1],[1,1,0,0],[],[],[],[]]},
- {id:'ma-sill-reflection',name:'Sill reflection',teaching:'Make space for matching runs. Undo restores the previous pour; Hint shows a step toward a settled board.',contribution:'Light gathers across the right lily and sill.',board:[[0,0,1,1],[1,1,2,2],[2,2,0,0],[],[],[]]},
- {id:'ma-moon-in-glass',name:'Moon in glass',teaching:'Free pairs can pour together. Each source and receiver stays occupied through recovery.',contribution:'The central moon pane and its reflection are restored.',board:ORDINARY_COMMISSION},
-];
-export function commission(id:string){const c=COMMISSIONS.find(c=>c.id===id);if(!c)throw Error('Unknown commission');return c;}
+export const CHAPTERS=[{id:'atelier',name:'Moonlit Atelier',description:'Gather the first ribbons of light.',payoff:'The atelier window shines again.'},{id:'garden',name:'Lily Garden',description:'Find space between interwoven colors.',payoff:'Ten lilies join your restoration album.'},{id:'observatory',name:'Quiet Observatory',description:'Let every constellation find its place.',payoff:'Your thirty lights form a complete constellation.'}] as const;
+export type Commission={id:string;name:string;teaching:string;contribution:string;board:number[][];chapter:number;target:number;trace:readonly (readonly number[])[]};
+const names=['First ribbons','First light','Sill reflection','Petal pairs','Quiet space','Brass dawn','Lily ribbons','Open window','Atelier glow','Moon in glass','Garden gate','Dew paths','Ivory leaves','Hidden jade','Lily pool','Winding stems','Rose garden','Moonflower','Petal labyrinth','Garden lantern','Star steps','North window','Jade orbit','Rose constellation','Evening prism','Cloud paths','Amber horizon','Lilac sky','Celestial weave','Still light'];
+const legacyIds=['ma-first-light','ma-sill-reflection','ma-moon-in-glass'];
+export const TUTORIAL_ID='sl-first-ribbons';
+export const COMMISSIONS:readonly Commission[]=CAMPAIGN_BOARDS.map((e,i)=>({id:i===0?TUTORIAL_ID:i<=2?legacyIds[i-1]:i===9?legacyIds[2]:`sl-${String(i+1).padStart(2,'0')}`,name:names[i],chapter:Math.floor(i/10),teaching:i===0?'Choose a glass, then an empty glass or a matching top color.':i===1?'A whole matching run pours together. Empty space helps you find the next match.':'Sort each color into a full glass. Undo and Hint are always free.',contribution:i===1?'The left lily pane transmits moonlight.':i===2?'Light gathers across the right lily and sill.':i===9?'The central moon pane and its reflection are restored.':`${names[i]} joins your constellation.`,board:e.board.map(g=>[...g]),target:e.trace.length,trace:e.trace}));
+export const LEGACY_COMMISSIONS=legacyIds.map(id=>COMMISSIONS.find(c=>c.id===id)!);
+export function commission(id:string){const c=COMMISSIONS.find(c=>c.id===id);if(!c)throw Error('Unknown level');return c;}
+export function levelIndex(id:string){return COMMISSIONS.indexOf(commission(id));}

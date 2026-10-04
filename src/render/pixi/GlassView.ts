@@ -61,8 +61,12 @@ export class GlassView{
   private glowList:Sprite[]=[];
   private ownedTextures:Texture[]=[this.shadowTexture,this.baseTexture,this.reflectionTexture,this.edgeTexture,this.rimTexture];
   private destroyed=false;
+  private originalCap:Texture;
+  private neutralCap:Texture;
+  setFinishes(cap:string,glass:string){this.capBody.texture=cap==='#ffffff'?this.originalCap:this.neutralCap;this.capBody.tint=cap;this.reflection.tint=glass;this.edgeHighlight.tint=glass;this.normalRim.tint=glass;}
 
-  constructor(capTexture:Texture){
+  constructor(capTexture:Texture,neutralCap=capTexture){
+    this.originalCap=capTexture;this.neutralCap=neutralCap;
     this.capBody.texture=capTexture;
     this.capBody.position.set(-CAP_SOURCE_SIZE/2,-CAP_SOURCE_BOTTOM);
     this.cap.addChild(this.capBody);

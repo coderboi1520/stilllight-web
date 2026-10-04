@@ -31,7 +31,8 @@ await withVerificationHarness({},async h=>{
   await b(2).click();await b(5).click();
   assert.equal(await page.getByRole('button',{name:'Undo',exact:true}).isEnabled(),false);
   await page.waitForTimeout(1750);
-  assert.equal(await page.evaluate(()=>window.__feedback.filter(p=>p==='16,14,10').length),2,'one live presented contact for each accepted flight');
+  assert.equal(await page.evaluate(()=>window.__STILLLIGHT_SESSION__.state().feedback.contact),2,'one presented contact for each accepted flight');
+  assert.equal(await page.evaluate(()=>window.__feedback.length),0,'silent candidate suppresses haptic dispatch');
   await page.evaluate(()=>{window.__rafCount=0;});await page.waitForTimeout(400);
   assert.equal(await page.evaluate(()=>window.__rafCount),0,'concurrent pours return to idle');
   const undo=()=>page.getByRole('button',{name:'Undo',exact:true}).click();

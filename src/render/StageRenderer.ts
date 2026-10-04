@@ -17,5 +17,6 @@ export class StageRenderer{
   render(frame:RenderFrame){this.renderer?.render(frame);}
   setPresentation(mode:Presentation){this.renderer?.setPresentation(mode);}
   setRestoration(count:number,alpha=1){this.renderer?.setRestoration(count,alpha);}
+  setFinishes(cap:string,glass:string){this.renderer?.setFinishes(cap,glass);}
   destroy(){this.renderer?.destroy();}
 }

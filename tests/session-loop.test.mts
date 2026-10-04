@@ -1,27 +1,27 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {StilllightModel} from '../src/core/model.ts';
-import {COMMISSIONS} from '../src/session/content.ts';
+import {COMMISSIONS,LEGACY_COMMISSIONS} from '../src/session/content.ts';
 import {solve} from '../src/session/solver.ts';
 import {SessionStore,SAVE_KEY,BACKUP_KEY} from '../src/session/storage.ts';
 import {GameSession} from '../src/session/session.ts';
 
 const settle=(m:StilllightModel,t:number)=>{for(let n=t;n<t+4000;n+=80){m.sample(n);m.advanceAfterFrame(n);}};
 test('accepted concurrent board and exact Undo history restore settled, rejecting foreign or forged history',()=>{
- const m=new StilllightModel(COMMISSIONS[2].board);m.choose(0,0);m.choose(1,1);m.choose(2,10);m.choose(5,11);
- const saved=m.exportState(),copy=new StilllightModel(COMMISSIONS[2].board);copy.restoreState(saved);
+ const m=new StilllightModel(LEGACY_COMMISSIONS[2].board);m.choose(0,0);m.choose(1,1);m.choose(2,10);m.choose(5,11);
+ const saved=m.exportState(),copy=new StilllightModel(LEGACY_COMMISSIONS[2].board);copy.restoreState(saved);
  assert.deepEqual(copy.board,[[2,0],[3,3],[0,1,1],[2,3,0,1],[1,2,3,0],[2]]);
  assert.equal(copy.busy,false);assert.equal(copy.undoDepth,2);assert.ok(copy.undo(0));settle(copy,0);assert.ok(copy.undo(4000));
- assert.deepEqual(copy.board,COMMISSIONS[2].board);
+ assert.deepEqual(copy.board,LEGACY_COMMISSIONS[2].board);
  assert.throws(()=>new StilllightModel(COMMISSIONS[0].board).restoreState(saved));
  const forged=structuredClone(saved);forged.history[0].amount=4;assert.throws(()=>copy.restoreState(forged));
  saved.board[0].push(3);assert.notDeepEqual(saved.board,m.board,'snapshot is copied');
 });
-test('three distinct commissions solve under actual maximal-pour rules; budget is unknown',()=>{
+test('campaign commissions solve under actual maximal-pour rules; budget is unknown',()=>{
  for(const c of COMMISSIONS){const result=solve(c.board,100000);assert.equal(result.kind,'solved',c.id);
  const m=new StilllightModel(c.board);let t=0;for(const [s,d] of result.path){m.choose(s,t);m.choose(d,t+1);settle(m,t);t+=4000;}
  assert.ok(m.board.every(g=>!g.length||g.length===4&&g.every(x=>x===g[0])));}
- assert.equal(solve(COMMISSIONS[2].board,0).kind,'unknown');
+ assert.equal(solve(LEGACY_COMMISSIONS[2].board,0).kind,'unknown');
 });
 test('persisted accepted path retains the existing 64-move Undo window and truthful move count',()=>{
  const m=new StilllightModel([[0],[],[],[],[],[]]);let t=0;

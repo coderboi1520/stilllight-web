@@ -8,6 +8,7 @@ import {backdropLayout} from '../sceneBackdrop.ts';
 import {restorationArtwork} from '../restoration.ts';
 import {makeVesselNumbers,NUMBER_HEIGHT,NUMBER_WIDTH,vesselNumberLayout} from '../vesselNumbers.ts';
 import {workbenchProps,type Presentation} from '../workbench.ts';
+import {tintedArtwork} from '../tintedArtwork.ts';
 
 export class PixiRenderer{
   readonly backend='webgl' as const;
@@ -22,12 +23,16 @@ export class PixiRenderer{
   private initialized=false;
   private movingOrder='';
   private density=1;
+  private capTint='#ffffff';
+  private glassTint='#ffffff';
+  setFinishes(cap:string,glass:string){this.capTint=cap;this.glassTint=glass;this.glasses?.forEach(g=>g.setFinishes(cap,glass));}
   private presentation:Presentation='game';
   private width=W;
   private height=H;
   setPresentation(mode:Presentation){this.presentation=mode;this.layoutScene();}
   private layoutScene(){this.scene.scale.set(this.width/W,this.presentation==='workbench'?this.width/W:this.height/H);this.scene.y=this.presentation==='workbench'?0:SCENE_TOP_PADDING*this.height/H;this.numbers.visible=this.presentation==='game';}
   private capTexture:Texture|null=null;
+  private neutralCapTexture:Texture|null=null;
   private backdrop:Sprite|null=null;
   // Keep changing restoration textures outside the authored glass batches.
   private restoration=new Container({isRenderGroup:true});
@@ -62,6 +67,7 @@ export class PixiRenderer{
     this.app.renderer.gc.enabled=false;
     this.app.renderer.scheduler.destroy();
     this.capTexture=await Assets.load<Texture>('/assets/pumpkin-cap.png');
+    const capSource=new Image();capSource.src='/assets/pumpkin-cap.png';await capSource.decode();this.neutralCapTexture=Texture.from(tintedArtwork(capSource,'#ffffff',true));
     this.backdrop=new Sprite(await Assets.load<Texture>('/assets/moonlit-studio.png'));this.backdrop.tint='#aaaaaa';
     host.appendChild(this.app.canvas);
     this.app.stage.addChild(this.backdrop,this.restoration,this.numbers,this.scene);
@@ -80,7 +86,8 @@ export class PixiRenderer{
       this.retiredViews.push(...this.streams);
     }
     if(!this.capTexture)throw new Error('Pumpkin cap texture unavailable');
-    this.glasses=Array.from({length:this.vesselCount},()=>new GlassView(this.capTexture!));
+    this.glasses=Array.from({length:this.vesselCount},()=>new GlassView(this.capTexture!,this.neutralCapTexture!));
+    this.glasses.forEach(g=>g.setFinishes(this.capTint,this.glassTint));
     this.streams=Array.from({length:Math.floor(this.vesselCount/2)},()=>new StreamView());
     this.scene.addChild(...this.glasses.map(g=>g.root),...this.streams.map(s=>s.root));this.movingOrder='';
   }
@@ -103,14 +110,31 @@ export class PixiRenderer{
     if(this.movingOrder===movingOrder||!this.glasses)return;
     this.movingOrder=movingOrder;
     let order=0;
-    for(let i=0;i<this.glasses.length;i++)if(!frame.glasses[i].moving)this.scene.setChildIndex(this.glasses[i].root,order++);
-    for(let i=0;i<this.glasses.length;i++)if(frame.glasses[i].moving)this.scene.setChildIndex(this.glasses[i].root,order++);
+    for(let i=frame.glasses.length;i<this.glasses.length;i++)this.scene.setChildIndex(this.glasses[i].root,order++);
+    for(let i=0;i<frame.glasses.length;i++)if(!frame.glasses[i].moving)this.scene.setChildIndex(this.glasses[i].root,order++);
+    for(let i=0;i<frame.glasses.length;i++)if(frame.glasses[i].moving)this.scene.setChildIndex(this.glasses[i].root,order++);
     for(const stream of this.streams)this.scene.setChildIndex(stream.root,order++);
   }
 
+  private ensureVesselCount(count:number){
+    // Grow a bounded retained view pool. Shrinking active boards must not retire
+    // meshes while Pixi is still holding their onRender callbacks. The model,
+    // frame and semantic controls contain exactly the active vessel count.
+    if(count>this.vesselCount&&this.glasses&&this.capTexture){
+      while(this.glasses.length<count){const g=new GlassView(this.capTexture,this.neutralCapTexture!);g.setFinishes(this.capTint,this.glassTint);this.glasses.push(g);this.scene.addChild(g.root);}
+      while(this.streams.length<Math.floor(count/2)){const stream=new StreamView();this.streams.push(stream);this.scene.addChild(stream.root);}
+      this.vesselCount=count;this.movingOrder='';
+    }
+    if(this.numbers.children.length!==count){
+      this.numbers.removeChildren().forEach(c=>c.destroy());this.numberTextures.forEach(t=>t.destroy(true));
+      this.numberTextures=makeVesselNumbers(this.vesselCount).map(c=>Texture.from(c));
+      this.numberTextures.forEach((texture,i)=>{const s=new Sprite(texture),p=vesselNumberLayout(i,this.width,this.height);s.width=NUMBER_WIDTH;s.height=NUMBER_HEIGHT;s.position.set(p.x,p.y);this.numbers.addChild(s);});
+    }
+  }
   render(frame:RenderFrame){
     if(!this.initialized||!this.glasses)return;
-    for(let i=0;i<this.glasses.length;i++){this.glasses[i].root.visible=this.presentation==='game';this.glasses[i].root.scale.set(1);this.glasses[i].update(frame.glasses[i]);}
+    this.ensureVesselCount(frame.glasses.length);
+    for(let i=0;i<this.glasses.length;i++){this.glasses[i].root.visible=this.presentation==='game'&&i<frame.glasses.length;this.glasses[i].root.scale.set(1);if(i<frame.glasses.length)this.glasses[i].update(frame.glasses[i]);}
     if(this.presentation==='workbench'){
       for(const p of workbenchProps(frame)){const root=this.glasses[p.index].root;root.visible=true;root.position.set(p.x,p.y);root.scale.set(p.scale);}
       for(const stream of this.streams)stream.root.visible=false;
@@ -119,5 +143,5 @@ export class PixiRenderer{
     this.ensureDrawOrder(frame);for(let i=0;i<this.streams.length;i++)this.streams[i].update(frame.streams[i]??null);this.app.renderer.render(this.app.stage);this.destroyRetiredViews();
   }
 
-  destroy(){this.app.canvas?.removeEventListener('webglcontextrestored',this.restoreHandler);this.glasses?.forEach(view=>view.destroy());this.streams.forEach(view=>view.destroy());this.glasses=null;this.streams.length=0;this.destroyRetiredViews();try{this.app.destroy(true,{children:true});}catch{}for(const texture of this.numberTextures)texture.destroy(true);this.numberTextures.length=0;this.initialized=false;}
+  destroy(){this.app.canvas?.removeEventListener('webglcontextrestored',this.restoreHandler);this.glasses?.forEach(view=>view.destroy());this.streams.forEach(view=>view.destroy());this.glasses=null;this.streams.length=0;this.destroyRetiredViews();try{this.app.destroy(true,{children:true});}catch{}for(const texture of this.numberTextures)texture.destroy(true);this.numberTextures.length=0;this.neutralCapTexture?.destroy(true);this.neutralCapTexture=null;this.initialized=false;}
 }

@@ -16,6 +16,8 @@
     "verify:runtime": "node scripts/verify-runtime.mjs",
     "verify:p2": "node --experimental-strip-types scripts/verification/verify-p2-loop.mjs",
     "verify:p2-visual": "node --experimental-strip-types scripts/verification/verify-p2-visual-correction.mjs",
+    "verify:campaign": "node --experimental-strip-types scripts/verification/verify-campaign.mjs",
+    "verify:product": "node --experimental-strip-types scripts/verification/verify-product-recovery.mjs",
     "verify:visual": "node scripts/verify-visual.mjs",
     "preview": "vite preview --host 127.0.0.1 --port 5180 --strictPort",
     "verify:freeze": "node scripts/verification/verify-frame-freeze.mjs",

@@ -1,4 +1,13 @@
 const paths:Record<string,string>={
+ star:'<path d="m12 2 3 7 7 1-5 5 1 7-6-4-6 4 1-7-5-5 7-1Z"/>',
+ shop:'<path d="M4 9h16l-2-6H6ZM5 9v12h14V9M9 21v-7h6v7"/>',
+ profile:'<circle cx="12" cy="7" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2Z"/>',
+ undo:'<path d="m9 4-6 6 6 6M3 10h11a6 6 0 0 1 0 12"/>',
+ hint:'<path d="M8 17c0-3-3-4-3-8a7 7 0 0 1 14 0c0 4-3 5-3 8ZM9 21h6M12 6v5"/>',
+ restart:'<path d="M4 10a8 8 0 1 1 2 8M4 3v7h7"/>',
+ music:'<path d="M9 17V5l11-2v12M9 9l11-2"/><ellipse cx="6" cy="18" rx="3" ry="2"/><ellipse cx="17" cy="16" rx="3" ry="2"/>',
+ lily:'<path d="M12 21V11M12 13C0 10 4 2 12 10M12 13C24 10 20 2 12 10M12 10c-5-6-2-9 0-9s5 3 0 9"/>',
+ orbit:'<circle cx="12" cy="12" r="4"/><ellipse cx="12" cy="12" rx="11" ry="5" transform="rotate(-35 12 12)"/>',
  home:'<path d="m3 11 9-8 9 8M6 9v11h12V9M10 20v-7h4v7"/>',
  settings:'<path d="m9 3-1 3-3 1-2 4 2 2v4l4 2 3-1 3 1 4-2v-4l2-2-2-4-3-1-1-3Z"/><circle cx="12" cy="12" r="3"/>',
  moon:'<path d="M17 3a9 9 0 1 0 4 14A9 9 0 0 1 17 3Z"/>',

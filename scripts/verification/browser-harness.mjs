@@ -63,8 +63,8 @@ export async function withVerificationHarness(options, fn) {
     const harness = {
       baseURL, browser, artifactsRoot,
       artifactDir: async name => { const dir = path.join(artifactsRoot, name); await mkdir(dir, { recursive: true }); return dir; },
-      newIsolatedPage: async ({ width = 400, height = 620, dpr = 1, initScripts = [] } = {}) => {
-        const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: dpr });
+      newIsolatedPage: async ({ width = 400, height = 620, dpr = 1, hasTouch = false, initScripts = [] } = {}) => {
+        const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: dpr, hasTouch });
         for (const script of initScripts) await context.addInitScript(script);
         const page = await context.newPage();
         page.on('dialog',dialog=>dialog.accept());
