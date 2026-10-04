@@ -2,6 +2,8 @@
 
 ## Owner scope addenda — 2026-10-04
 
+**P1.3 → P2 authorization and delivery:** owner accepted the cleanup/fixes in personal testing (“all good in my testing”) and instructed “finish major stage now.” Authorized one local inline implementer, Worktree OFF, no agents/reviewer chats, coherent scoped commits, safe main integration and normal push. The bounded candidate adds real session/storage/Continue and three ordinary commissions, one representative window with three restoration contributions, Home/navigation/journal/returning Settings, once-only final-settle completion/Next and minimum event audio. Preserve all accepted core/motion/material contracts. No P3/full-room campaign/bulk levels, replacement mechanics, native packaging or distribution. Evidence: `../progress/P1_3_P2_ORDINARY_LOOP_ACCEPTANCE.md`. Routine scope choices were delegated; owner playtests this delivered candidate in its implementation chat.
+
 **Ordinary fix run:** PF01 keyboard focus, PF02 removal of rejected liquid symbols/legend, PF03 independently concurrent ordinary pours. Lightwork is **CANCELLED**, including ordered delivery wells/requests. Other new mechanics/modes are **ON HOLD**; PF03 is the owner's explicit exception. No replacement ornamentation/mode. See the factual Ordinary Fix Run acceptance record.
 
 **Post-run cleanup and PF04:** owner explicitly authorizes removing obsolete original/oracle demo, standalone benchmark prototypes, exclusive tooling/checks, unused legacy haptics copies, duplicate staged artwork and superseded worker/audit guidance. The accepted latest glass is transparent Pixi glass; Canvas shares that material while retaining its compatibility backend. Current manual-clock/debug/FrameGate/snapshots and useful core/runtime tests remain. Preserve current evidence/assets; never touch external planning folders, Downloads or other projects.
@@ -35,7 +37,7 @@ Owner instructions outrank old task documents/ratification/skill defaults. Phase
 
 Delivered ordinary/P0–P1.1 foundation and PF01–PF03 corrections, followed by PF04 transparent fallback/current-project cleanup. Factual records live in `docs/progress/`; automated completion is not owner acceptance.
 
-Next action: owner playtest. Future separately authorized sequence: **P1.3 existing-game correctness/recovery/exact save/Continue → P2 authored Home/navigation/settings/completion/restoration → Golden acceptance**. Lightwork is removed from that sequence. Cleanup implements no save/Home/P2/campaign/audio expansion/Android packaging. Other new mechanics/modes remain held.
+Current stop: owner playtest the delivered **P1.3/P2 ordinary implementation candidate → Golden acceptance**. Lightwork is removed from the sequence. The historical cleanup implemented no save/Home/P2; this separately authorized run adds that finite ordinary slice and minimum event audio. P3/full-room campaign, bulk content, Android packaging and other new mechanics/modes remain held. Formal P2 human/director/device gates are not waived by automated checks or by the owner's earlier cleanup acceptance.
 
 Golden and first-room human acceptance precede campaign scope/bulk authoring. Commercial Web channel and physical/platform qualification have separate gates. Do not invent/relax campaign quotas or device budgets. Gameplay, device, screen-reader and commercial acceptance remain NOT RUN until observed.
 
