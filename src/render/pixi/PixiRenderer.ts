@@ -5,6 +5,7 @@ import {GlassView} from './GlassView.ts';
 import {StreamView} from './StreamView.ts';
 import {configureAssetDensity} from './assets.ts';
 import {backdropLayout} from '../sceneBackdrop.ts';
+import {restorationArtwork} from '../restoration.ts';
 import {makeVesselNumbers,NUMBER_HEIGHT,NUMBER_WIDTH,vesselNumberLayout} from '../vesselNumbers.ts';
 
 export class PixiRenderer{
@@ -22,6 +23,18 @@ export class PixiRenderer{
   private density=1;
   private capTexture:Texture|null=null;
   private backdrop:Sprite|null=null;
+  // Keep changing restoration textures outside the authored glass batches.
+  private restoration=new Container({isRenderGroup:true});
+  private restorationTextures:Texture[]=[];
+  private restorationCount=-1;
+  setRestoration(count:number,alpha=1){
+    if(count!==this.restorationCount){
+      this.restoration.removeChildren().forEach(c=>c.destroy());this.restorationTextures.forEach(t=>t.destroy(true));
+      this.restorationTextures=[restorationArtwork(Math.max(0,count-1)),restorationArtwork(count,true)].map(c=>Texture.from(c));
+      this.restoration.addChild(...this.restorationTextures.map(t=>new Sprite(t)));this.restorationCount=count;
+    }
+    if(this.restoration.children[1])this.restoration.children[1].alpha=alpha;
+  }
   private host:HTMLElement|null=null;
   private onRestore:()=>void=()=>{};
   private restoreHandler=()=>{this.onRestore();};
@@ -45,7 +58,7 @@ export class PixiRenderer{
     this.capTexture=await Assets.load<Texture>('/assets/pumpkin-cap.png');
     this.backdrop=new Sprite(await Assets.load<Texture>('/assets/moonlit-studio.png'));this.backdrop.tint='#aaaaaa';
     host.appendChild(this.app.canvas);
-    this.app.stage.addChild(this.backdrop,this.numbers,this.scene);
+    this.app.stage.addChild(this.backdrop,this.restoration,this.numbers,this.scene);
     this.numberTextures=makeVesselNumbers(this.vesselCount).map(canvas=>Texture.from(canvas));
     for(const texture of this.numberTextures){const number=new Sprite(texture);number.width=NUMBER_WIDTH;number.height=NUMBER_HEIGHT;this.numbers.addChild(number);}
     this.rebuildViews(false);
@@ -76,6 +89,8 @@ export class PixiRenderer{
     this.scene.y=SCENE_TOP_PADDING*height/H;
     for(let i=0;i<this.numbers.children.length;i++){const p=vesselNumberLayout(i,width,height);this.numbers.children[i].position.set(p.x,p.y);}
     if(this.backdrop&&this.host){const layout=backdropLayout(this.host,width,height,this.backdrop.texture.width,this.backdrop.texture.height);this.backdrop.visible=!!layout;if(layout){this.backdrop.position.set(layout.x,layout.y);this.backdrop.width=layout.width;this.backdrop.height=layout.height;}}
+    this.restoration.visible=this.backdrop?.visible??false;
+    if(this.backdrop){this.restoration.position.copyFrom(this.backdrop.position);this.restoration.scale.set(this.backdrop.width/1024,this.backdrop.height/1536);}
   }
 
   private ensureDrawOrder(frame:RenderFrame){

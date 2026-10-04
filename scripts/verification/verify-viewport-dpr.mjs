@@ -15,7 +15,7 @@ export async function run(harness) {
     const cases = [];
     for (const [width, height, dpr, label] of [[400,620,1,'portrait-1x'],[320,496,2,'portrait-2x'],[620,400,1,'landscape']]) {
       const isolated=await harness.newIsolatedPage({width,height,dpr}), testPage=isolated.page;
-      await harness.goto(testPage); await testPage.waitForSelector('#pixi-host canvas');
+      await harness.gotoGame(testPage); await testPage.waitForSelector('#pixi-host canvas');
       const seen = await inspect(testPage); cases.push({ label, ...seen });
       if (Math.abs(seen.css[0]-seen.board[0])>1 || Math.abs(seen.css[1]-seen.board[1])>1) throw new Error(`${label}: board/canvas CSS mismatch ${JSON.stringify(seen)}`);
       if (seen.backing[0] !== Math.round(seen.css[0]*Math.min(dpr,2)) || seen.backing[1] !== Math.round(seen.css[1]*Math.min(dpr,2))) throw new Error(`${label}: backing/DPR mismatch ${JSON.stringify(seen)}`);
@@ -23,7 +23,7 @@ export async function run(harness) {
       await isolated.context.close();
     }
     pageCtx=await harness.newIsolatedPage({width:400,height:620,dpr:1});
-    const {page,errors}=pageCtx; await harness.goto(page); await page.waitForSelector('#pixi-host canvas');
+    const {page,errors}=pageCtx; await harness.gotoGame(page); await page.waitForSelector('#pixi-host canvas');
     // Same-DPR change on one live page.
     let metrics = await harness.setDeviceMetrics(page, { width: 400,height:620,dpr:1 }); await page.waitForTimeout(150); await metrics.detach();
     metrics = await harness.setDeviceMetrics(page, { width: 360,height:558,dpr:1 }); await page.waitForTimeout(200); await metrics.detach();

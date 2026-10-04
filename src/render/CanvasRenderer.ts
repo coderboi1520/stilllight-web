@@ -2,6 +2,7 @@ import { COLORS,COMPLETION_ACCENTS,GLASS_BOTTOM,H,SCENE_TOP_PADDING,W } from '..
 import type {GlassFrame,LiquidLayerFrame,RenderFrame,StreamFrame} from '../core/RenderFrame.ts';
 import {CAP_ART_SCALE,CAP_ART_WIDTH,CAP_SOURCE_BOTTOM} from './capArtwork.ts';
 import {backdropLayout} from './sceneBackdrop.ts';
+import {restorationArtwork} from './restoration.ts';
 import {drawInteriorGlassPath,makeGlassArtwork} from './glassMaterial.ts';
 import {makeVesselNumbers,NUMBER_HEIGHT,NUMBER_WIDTH,vesselNumberLayout} from './vesselNumbers.ts';
 
@@ -23,6 +24,9 @@ export class CanvasRenderer{
   private backdropImage:HTMLImageElement|null=null;
   private backdrop:ReturnType<typeof backdropLayout>=null;
   private host:HTMLElement|null=null;
+  private restoration=0;
+  private restorationAlpha=1;
+  setRestoration(count:number,alpha=1){this.restoration=count;this.restorationAlpha=alpha;}
 
   async init(host:HTMLElement){this.host=host;this.capImage=new Image();this.capImage.src='/assets/pumpkin-cap.png';this.backdropImage=new Image();this.backdropImage.src='/assets/moonlit-studio.png';await Promise.all([this.capImage.decode(),this.backdropImage.decode()]);this.canvas.setAttribute('aria-hidden','true');host.appendChild(this.canvas);}
   resize(width:number,height:number,density:number){this.width=Math.max(1,width);this.height=Math.max(1,height);this.density=Math.max(1,Math.min(density,2));this.canvas.width=Math.max(1,Math.round(this.width*this.density));this.canvas.height=Math.max(1,Math.round(this.height*this.density));this.canvas.style.width=`${this.width}px`;this.canvas.style.height=`${this.height}px`;if(this.host&&this.backdropImage)this.backdrop=backdropLayout(this.host,width,height,this.backdropImage.naturalWidth,this.backdropImage.naturalHeight);}
@@ -70,7 +74,7 @@ export class CanvasRenderer{
 
   render(frame:RenderFrame){
     const ctx=this.ctx,sx=this.width/W,sy=this.height/H;ctx.setTransform(this.density,0,0,this.density,0,0);ctx.clearRect(0,0,this.width,this.height);ctx.fillStyle='#071219';ctx.fillRect(0,0,this.width,this.height);
-    if(this.backdrop&&this.backdropImage){const b=this.backdrop;ctx.drawImage(this.backdropImage,b.x,b.y,b.width,b.height);ctx.fillStyle='rgba(0,0,0,.333333)';ctx.fillRect(0,0,this.width,this.height);}
+    if(this.backdrop&&this.backdropImage){const b=this.backdrop;ctx.drawImage(this.backdropImage,b.x,b.y,b.width,b.height);ctx.fillStyle='rgba(0,0,0,.333333)';ctx.fillRect(0,0,this.width,this.height);ctx.drawImage(restorationArtwork(Math.max(0,this.restoration-1)),b.x,b.y,b.width,b.height);ctx.globalAlpha=this.restorationAlpha;ctx.drawImage(restorationArtwork(this.restoration,true),b.x,b.y,b.width,b.height);ctx.globalAlpha=1;}
     if(frame.glasses.length>2&&this.numbers.length!==frame.glasses.length)this.numbers=makeVesselNumbers(frame.glasses.length);
     for(let i=0;i<this.numbers.length;i++){const p=vesselNumberLayout(i,this.width,this.height);ctx.drawImage(this.numbers[i],p.x,p.y,NUMBER_WIDTH,NUMBER_HEIGHT);}
     ctx.setTransform(this.density*sx,0,0,this.density*sy,0,0);ctx.translate(0,SCENE_TOP_PADDING);

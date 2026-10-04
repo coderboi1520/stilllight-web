@@ -142,6 +142,7 @@ export class StilllightModel{
   }
 
   get undoDepth(){return this.moveHistory.length;}
+  get moveCount(){return this.acceptedHistory.length;}
 
   exportState():ModelState{return structuredClone({board:this.board,history:this.acceptedHistory});}
   restoreState(value:unknown){

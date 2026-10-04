@@ -6,7 +6,7 @@ export async function run(harness) {
   const started=performance.now(), name='CONTEXT_RESTORE'; let item, artifacts=[];
   try {
     const dir=await harness.artifactDir('context-restore'); item=await harness.newIsolatedPage(); const {page,errors}=item;
-    await harness.goto(page); await page.waitForSelector('#pixi-host canvas'); await page.waitForTimeout(250);
+    await harness.gotoGame(page); await page.waitForSelector('#pixi-host canvas'); await page.waitForTimeout(250);
     const result=await page.evaluate(async()=>{
       const canvas=document.querySelector('#pixi-host canvas');const gl=canvas.getContext('webgl2')||canvas.getContext('webgl');
       if(!gl)return{unsupported:true}; const ext=gl.getExtension('WEBGL_lose_context');if(!ext)return{unsupported:true};

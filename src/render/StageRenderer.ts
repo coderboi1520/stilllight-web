@@ -14,5 +14,6 @@ export class StageRenderer{
   }
   resize(width:number,height:number,density:number){this.renderer?.resize(width,height,density);}
   render(frame:RenderFrame){this.renderer?.render(frame);}
+  setRestoration(count:number,alpha=1){this.renderer?.setRestoration(count,alpha);}
   destroy(){this.renderer?.destroy();}
 }

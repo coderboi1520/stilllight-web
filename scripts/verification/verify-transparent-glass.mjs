@@ -5,7 +5,7 @@ await withVerificationHarness({},async h=>{
  const dir=await h.artifactDir('current-cleanup');let accepted;
  for(const backend of ['webgl','canvas']){
   const {page,context,errors}=await h.newIsolatedPage({width:400,height:889,initScripts:backend==='canvas'?[disableWebGL]:[]});
-  await h.goto(page);await page.waitForFunction(()=>!!window.__STILLLIGHT_PIXI__);
+  await h.gotoGame(page);await page.waitForFunction(()=>!!window.__STILLLIGHT_PIXI__);
   assert.equal(await page.evaluate(()=>window.__STILLLIGHT_PIXI__.backend()),backend);
   await page.evaluate(()=>{const a=window.__STILLLIGHT_PIXI__;a.action('reset',1000);a.step(1000);});
   const colors=await page.evaluate(async()=>{

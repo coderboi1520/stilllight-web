@@ -67,6 +67,7 @@ export async function withVerificationHarness(options, fn) {
         const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: dpr });
         for (const script of initScripts) await context.addInitScript(script);
         const page = await context.newPage();
+        page.on('dialog',dialog=>dialog.accept());
         const errors = [];
         page.on('pageerror', error => errors.push(`pageerror: ${error.message}`));
         page.on('console', msg => { if (msg.type() === 'error') errors.push(`console: ${msg.text()}`); });
@@ -81,6 +82,16 @@ export async function withVerificationHarness(options, fn) {
         return cdp;
       },
       goto: async (page, suffix = '/') => page.goto(`${baseURL.replace(/\/$/, '')}${suffix}`, { waitUntil: 'networkidle', timeout: 20000 }),
+      // Existing renderer/input checks still exercise the accepted dense board.
+      // Enter it through a valid local session and Home Continue, not a new route.
+      gotoGame: async (page, suffix = '/') => {
+        await page.goto(`${baseURL.replace(/\/$/, '')}${suffix}`,{waitUntil:'networkidle',timeout:20000});
+        await page.waitForFunction(()=>!!window.__STILLLIGHT_PIXI__);
+        if(suffix.includes('fixture=reference'))return;
+        await page.evaluate(()=>{window.__STILLLIGHT_PIXI__.enterParity();localStorage.setItem('stilllight.session.v1',JSON.stringify({version:1,awarded:['ma-first-light','ma-sill-reflection'],active:{id:'ma-moon-in-glass',state:{board:[[2,0,3],[3],[0,1,1,2],[2,3,0,1],[1,2,3,0],[]],history:[]},hints:0,completed:false}}));});
+        await page.reload({waitUntil:'networkidle'});await page.waitForFunction(()=>!!window.__STILLLIGHT_PIXI__);
+        await page.getByRole('button',{name:/^Continue /}).click();
+      },
     };
     return await fn(harness);
   } catch (error) {

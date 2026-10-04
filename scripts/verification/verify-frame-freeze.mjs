@@ -12,7 +12,7 @@ export async function run(harness) {
     const dir = await harness.artifactDir('frame-freeze');
     item = await harness.newIsolatedPage();
     const { page, errors } = item;
-    await harness.goto(page);
+    await harness.gotoGame(page);
     await page.waitForSelector('#pixi-host canvas');
 
     async function check(label, action, presentedAt, expectPresented, expectNext) {

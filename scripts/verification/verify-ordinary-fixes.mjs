@@ -6,9 +6,9 @@ await withVerificationHarness({},async h=>{
  const dir=await h.artifactDir('ordinary-fixes');
  for(const backend of ['webgl','canvas']){
   const {page,context,errors}=await h.newIsolatedPage({width:400,height:889,initScripts:backend==='canvas'?[probe,disableWebGL]:[probe]});
-  await h.goto(page);await page.waitForFunction(()=>!!window.__STILLLIGHT_PIXI__);
+  await h.gotoGame(page);await page.waitForFunction(()=>!!window.__STILLLIGHT_PIXI__);
   assert.equal(await page.evaluate(()=>window.__STILLLIGHT_PIXI__.backend()),backend);
-  await page.keyboard.press('Tab');await page.keyboard.press('Enter');
+  await page.locator('[data-glass="0"]').focus();await page.keyboard.press('Enter');
   const focus=await page.locator('[data-glass="0"]').evaluate(b=>({focused:b.matches(':focus-visible'),outline:getComputedStyle(b).outlineStyle,visualChildren:b.childElementCount}));
   console.log(`${backend} focus: ${JSON.stringify(focus)}`);
   await page.screenshot({path:`${dir}/${backend}-keyboard-focus.png`});
@@ -49,7 +49,7 @@ await withVerificationHarness({},async h=>{
   await page.screenshot({path:`${dir}/${backend}-two-streams.png`});
   for(const [width,height] of [[400,889],[450,1000]]){
    await page.setViewportSize({width,height});
-   const rects=await page.locator('button').evaluateAll(bs=>bs.map(b=>{const r=b.getBoundingClientRect();return {w:r.width,h:r.height,x:r.x,y:r.y,right:r.right,bottom:r.bottom};}));
+   const rects=await page.locator('button:visible').evaluateAll(bs=>bs.map(b=>{const r=b.getBoundingClientRect();return {w:r.width,h:r.height,x:r.x,y:r.y,right:r.right,bottom:r.bottom};}));
    for(const r of rects){assert.ok(r.w>=48&&r.h>=48,JSON.stringify(r));assert.ok(r.x>=0&&r.y>=0&&r.right<=width&&r.bottom<=height,JSON.stringify(r));}
   }
   await page.evaluate(()=>{const a=window.__STILLLIGHT_PIXI__;a.action('reset',performance.now());a.exitParity();});

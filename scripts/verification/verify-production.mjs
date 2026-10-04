@@ -15,11 +15,12 @@ await withVerificationHarness({},async h=>{
   const state=()=>page.evaluate(()=>window.__STILLLIGHT_PIXI__.state());
   const initial=(await state()).board;
   assert.equal((await state()).selected,null,'input while assets initialize is safely ignored');
+  await h.gotoGame(page);
   await page.getByRole('button',{name:'Hint',exact:true}).click();assert.deepEqual((await state()).board,initial);await page.waitForTimeout(750);
   await page.locator('[data-glass="0"]').click();await page.locator('[data-glass="1"]').click();await page.waitForTimeout(1800);
   assert.equal(await page.getByRole('button',{name:'Undo',exact:true}).isEnabled(),true);await page.getByRole('button',{name:'Undo',exact:true}).click();await page.waitForTimeout(650);
   assert.deepEqual((await state()).board,initial);
-  await page.getByRole('button',{name:'Haptics',exact:true}).click();await page.reload();await page.waitForFunction(()=>!!window.__STILLLIGHT_PIXI__,{},{timeout:5000});
+  await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Haptics',exact:true}).click();await page.reload();await page.waitForFunction(()=>!!window.__STILLLIGHT_PIXI__,{},{timeout:5000});await page.getByRole('button',{name:'Settings',exact:true}).click();
   assert.equal(await page.getByRole('button',{name:'Haptics',exact:true}).getAttribute('aria-pressed'),'false');
   assert.equal(errors.length,0,errors.join('\n'));await page.screenshot({path:`${dir}/production-${backend}-400x889.png`});await context.close();
   console.log(`PASS production ${backend}: startup/early input, six-vessel scene, Hint, real pointer pour, exact Undo, preference reload, no browser errors`);

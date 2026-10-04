@@ -5,7 +5,7 @@ await withVerificationHarness({},async h=>{
  const dir=await h.artifactDir('current-cleanup');
  for(const backend of ['webgl','canvas']){
   const {page,context,errors}=await h.newIsolatedPage({width:400,height:889,initScripts:backend==='canvas'?[disableWebGL]:[]});
-  await h.goto(page);await page.waitForFunction(()=>!!window.__STILLLIGHT_PIXI__);
+  await h.gotoGame(page);await page.waitForFunction(()=>!!window.__STILLLIGHT_PIXI__);
   assert.equal(await page.evaluate(()=>window.__STILLLIGHT_PIXI__.backend()),backend);
   assert.equal(await page.locator('.hit-glasses button > *').count(),0,'no artwork in the controls above the canvas');
   const ink=async time=>page.evaluate(async time=>{

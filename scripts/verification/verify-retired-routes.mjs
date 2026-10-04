@@ -7,7 +7,7 @@ const retired=['debug.html','reference/original/index.html','reference/original/
 for(const path of retired){let exists=true;try{await access(new URL(`../../${path}`,import.meta.url));}catch{exists=false;}assert.equal(exists,false,`retired source remains: ${path}`);}
 await withVerificationHarness({},async h=>{
  const root=await fetch(h.baseURL);assert.ok(root.ok);const game=await root.text();
- assert.match(game,/STILLLIGHT — Moonlit commission/);
+ assert.match(game,/STILLLIGHT — Moonlit Atelier/);
  for(const path of retired){
   const response=await fetch(`${h.baseURL}/${path}`),body=await response.text();
   assert.ok(response.status===404||response.status===200&&body===game,`retired route serves a distinct payload: ${path} (${response.status})`);

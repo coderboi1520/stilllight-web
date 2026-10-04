@@ -136,7 +136,7 @@ test('viewport controller explicitly watches DPR-only changes without RAF pollin
 
 test('idle RAF harness resets startup requests before measuring settled idle',()=>{
   const idle=read('../scripts/verification/verify-idle-raf.mjs');
-  const settled=idle.slice(idle.indexOf('await harness.goto(page)'),idle.indexOf('const first='));
+  const settled=idle.slice(idle.indexOf('await harness.gotoGame(page)'),idle.indexOf('const first='));
   assert.match(settled,/waitForFunction\(\(\)=>!!window\.__STILLLIGHT_PIXI__\)/);
   assert.match(settled,/__rafProbe\.reset\(\)/);
 });

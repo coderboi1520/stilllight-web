@@ -14,6 +14,12 @@ import {HapticEngine} from './platform/haptics.ts';
 import {readHapticsEnabled,writeHapticsEnabled} from './platform/hapticsPreference.ts';
 import {readReducedMotion,writeReducedMotion} from './platform/motionPreference.ts';
 import {presentedPourContact} from './platform/presentedFeedback.ts';
+import {GameSession} from './session/session.ts';
+import {SessionStore} from './session/storage.ts';
+import {commission,COMMISSIONS} from './session/content.ts';
+import {solve} from './session/solver.ts';
+import {ShellViews,type Screen} from './shell/views.ts';
+import {EventAudio,readSound,SOUND_KEY,type AudioEvent} from './platform/audio.ts';
 
 // Do not suspend the entry module: production renderer chunks share its exports.
 // A top-level await here deadlocks their dynamic imports after bundling.
@@ -23,15 +29,29 @@ const host=document.querySelector<HTMLElement>('#pixi-host')!;
 const board=document.querySelector<HTMLElement>('.board')!;
 const query=new URLSearchParams(location.search);
 const reference=import.meta.env.DEV&&query.get('fixture')==='reference';
-const initial=reference?INITIAL:ORDINARY_COMMISSION;
+const store=new SessionStore({getItem:k=>localStorage.getItem(k),setItem:(k,v)=>localStorage.setItem(k,v)});
+const session=new GameSession(reference?undefined:store.load());
+const shell=new ShellViews();
+const initial=reference?INITIAL:commission(session.id).board;
 document.querySelector('.atelier')!.classList.toggle('reference',reference);
 const renderer=new StageRenderer(initial.length);
-const model=new StilllightModel(initial);
+let model=reference?new StilllightModel(initial):session.model;
 model.reducedMotion=!reference&&readReducedMotion();
+let reducedMotionEnabled=model.reducedMotion;
 let hapticsEnabled=readHapticsEnabled();
 const haptics=new HapticEngine(hapticsEnabled);
 const contactFlights=new WeakSet<object>();
-let completed=false;
+let completed=session.completed;
+let soundEnabled=readSound(),preferenceError:string|null=null;
+const pendingPreferences=new Map<string,boolean>();
+const audio=new EventAudio(soundEnabled);
+let restorationStarted:number|null=null;
+const feedbackCounts={select:0,contact:0,invalid:0,complete:0,ui:0};
+function sound(event:AudioEvent,now=performance.now()){if(!frameGate.isParity()&&!document.hidden){feedbackCounts[event]++;audio.play(event,now);}}
+function storageMessage(){shell.storageError(preferenceError??store.error,store.recovery==='backup'?'Recover save':store.recovery==='new'?'Start a new save':'Retry saving');}
+function save(){if(!reference){store.save(session.snapshot());storageMessage();}}
+function refresh(){if(!reference){shell.update(session);storageMessage();}}
+function adoptModel(){model=session.model;model.reducedMotion=reducedMotionEnabled;completed=session.completed;restorationStarted=null;}
 const status=document.querySelector<HTMLElement>('.status')!;
 const control=(name:string)=>document.querySelector<HTMLButtonElement>(`[data-action="${name}"]`)!;
 const hits=document.querySelector<HTMLElement>('.hit-glasses')!;
@@ -41,9 +61,11 @@ const glassButtons=initial.map((_,i)=>{
   hits.append(b);b.addEventListener('click',()=>choose(i));return b;
 });
 function updateControls(){
-  glassButtons.forEach((b,i)=>{const layers=model.board[i];b.setAttribute('aria-label',`Vessel ${i+1}, ${layers.length?`top to bottom: ${[...layers].reverse().map(c=>COLOR_NAMES[c]).join(', ')}`:'empty'}`);b.setAttribute('aria-pressed',String(model.selected===i));b.disabled=!model.isVesselAvailable(i);});
+  glassButtons.forEach((b,i)=>{const layers=model.board[i];b.setAttribute('aria-label',`Vessel ${i+1}, ${layers.length?`top to bottom: ${[...layers].reverse().map(c=>COLOR_NAMES[c]).join(', ')}`:'empty'}`);b.setAttribute('aria-pressed',String(model.selected===i));b.disabled=(!reference&&session.completed)||!model.isVesselAvailable(i);});
   control('hint').disabled=model.busy||!!model.settleMotion;
   control('undo').disabled=!model.canUndo(performance.now());
+  control('sound').setAttribute('aria-pressed',String(soundEnabled));control('sound').setAttribute('aria-label',`Sound ${soundEnabled?'On':'Off'}`);control('sound').querySelector('span')!.textContent=soundEnabled?'On':'Off';
+  if(!reference)document.querySelector('.move-count')!.textContent=`${model.moveCount} ${model.moveCount===1?'move':'moves'} · ${session.hints} hints`;
   for(const [name,on] of [['haptics',hapticsEnabled],['motion',model.reducedMotion]] as const){control(name).setAttribute('aria-pressed',String(on));control(name).querySelector('span')!.textContent=on?'On':'Off';}
 }
 let lastRenderedTime=performance.now();
@@ -55,51 +77,81 @@ await renderer.init(host,()=>invalidateScene());
 function draw(now=performance.now()){renderAt(now,true,true);}
 const frameGate=new FrameGate(cb=>requestAnimationFrame(cb),id=>cancelAnimationFrame(id),draw);
 function renderAt(now:number,advance:boolean,recordMetrics:boolean){
+  const reveal=restorationStarted===null?1:model.reducedMotion?1:Math.min(1,Math.max(0,(now-restorationStarted)/900));
+  renderer.setRestoration(reference?0:session.awarded.length,reveal);shell.reveal(reveal);
   if(recordMetrics){if(metrics.last)metrics.intervals.push(now-metrics.last);metrics.last=now;}
   const a=performance.now(),frame=model.sample(now),b=performance.now();renderer.render(frame);lastPresentedFrame=frame;const c=performance.now();lastRenderedTime=now;
   if(recordMetrics){metrics.prep.push(b-a);metrics.render.push(c-b);if(metrics.prep.length>600){metrics.prep.shift();metrics.render.shift();metrics.intervals.shift();}}
   if(advance){
-    for(const flight of model.flights)if(!frameGate.isParity()&&flight.kind==='pour'&&presentedPourContact(frame,model.reducedMotion,flight.id)&&!contactFlights.has(flight)){contactFlights.add(flight);haptics.trigger('pourContact',false,true);}
+    for(const flight of model.flights)if(!frameGate.isParity()&&!document.hidden&&shell.screen==='game'&&flight.kind==='pour'&&presentedPourContact(frame,model.reducedMotion,flight.id)&&!contactFlights.has(flight)){contactFlights.add(flight);haptics.trigger('pourContact',false,true);sound('contact',now);}
     const eventCount=model.eventCount,changed=model.advanceAfterFrame(now);
-    if(!frameGate.isParity()){
+    if(!frameGate.isParity()&&!document.hidden&&shell.screen==='game'){
       const events=model.eventCount>eventCount?model.events.slice(-(model.eventCount-eventCount)):[];
       for(const event of events)if(event.startsWith('cap-contact:'))haptics.trigger('glassComplete',false,true);
       const solved=model.board.every(g=>!g.length||isBottleComplete(g));
       if(!solved)completed=false;
-      if(solved&&!model.isAnimating()&&!completed){completed=true;status.textContent='Commission complete. Every color is settled.';haptics.trigger('levelComplete');}
+      if(solved&&!model.isAnimating()&&!completed&&session.finish()){completed=true;restorationStarted=session.isReplay?null:now;status.textContent='Commission complete. Every color is settled.';haptics.trigger('levelComplete');sound('complete',now);save();refresh();if(restorationStarted!==null)shell.reveal(model.reducedMotion?1:0);document.querySelector<HTMLButtonElement>('.result button')!.focus({preventScroll:true});}
       updateControls();
     }
-    if(!frameGate.isParity()&&(model.isAnimating()||changed))schedule();
+    if(restorationStarted!==null&&(model.reducedMotion||now-restorationStarted>=900))restorationStarted=null;
+    if(!frameGate.isParity()&&(model.isAnimating()||changed||restorationStarted!==null))schedule();
   }
   return frame;
 }
-function schedule(){frameGate.schedule();}
+function schedule(){if(!document.hidden&&(reference||shell.screen==='game'))frameGate.schedule();}
 function invalidateScene(){if(frameGate.isParity()){if(lastPresentedFrame)renderer.render(lastPresentedFrame);return;}if(model.isAnimating())schedule();else renderer.render(model.sample(lastRenderedTime));}
 function choose(i:number){
-  if(!ready||frameGate.isParity())return;
-  const count=model.eventCount;model.choose(i,performance.now());
+  if(!ready||frameGate.isParity()||(!reference&&(shell.screen!=='game'||session.completed)))return;
+  void audio.unlock();const count=model.eventCount,moves=model.moveCount;model.choose(i,performance.now());
   if(model.eventCount>count){const event=model.events.at(-1)!;
-    if(event.startsWith('selected:')){haptics.trigger('select');status.textContent=`Vessel ${i+1} selected. Choose a destination.`;}
-    else if(event.startsWith('invalid:')){haptics.trigger('reject');status.textContent='Choose a matching top color or an empty vessel with space.';}
+    if(event.startsWith('selected:')){haptics.trigger('select');sound('select');status.textContent=`Vessel ${i+1} selected. Choose a destination.`;}
+    else if(event.startsWith('invalid:')){haptics.trigger('reject');sound('invalid');status.textContent='Choose a matching top color or an empty vessel with space.';}
     else if(event.startsWith('pour-start:')){const flight=model.flights.at(-1)!;status.textContent=`Pouring ${flight.amount} ${COLOR_NAMES[flight.color]} ${flight.amount===1?'unit':'units'} into vessel ${i+1}.`;}
     else status.textContent='Selection cleared.';
   }
+  if(model.moveCount!==moves)save();
   updateControls();schedule();
 }
 function action(name:string){
   if(!ready||frameGate.isParity())return;
+  void audio.unlock();
   const now=performance.now();
-  if(name==='hint'){model.hint(now);if(model.hintMotion){status.textContent=`Hint: vessel ${model.hintMotion.source+1} to vessel ${model.hintMotion.target+1}.`;haptics.trigger('uiClick');}else status.textContent='No useful pour is available. Undo or restart to recover.';}
-  if(name==='undo'&&model.undo(now)){completed=false;status.textContent='Previous pour restored.';haptics.trigger('uiClick');}
-  if(name==='restart'){model.reset();completed=false;status.textContent='Commission restarted.';haptics.trigger('uiClick');}
+  if(['hint','undo','restart'].includes(name)&&!reference&&(shell.screen!=='game'||session.completed))return;
+  if(name==='hint'&&!model.busy&&!model.settleMotion){const result=solve(model.board);const pair=result.path[0];if(pair&&model.showHint(...pair,now)){session.hints++;save();status.textContent=`Hint: vessel ${pair[0]+1} to vessel ${pair[1]+1}, a step toward settling every color.`;haptics.trigger('uiClick');sound('ui');}else status.textContent=result.kind==='unknown'?'Hint search reached its limit. Try a legal pour, Undo or Restart.':result.kind==='blocked'?'No solution from this board. Undo or Restart to recover.':'Every color is already settled.';}
+  if(name==='undo'&&model.undo(now)){completed=false;session.completed=false;status.textContent='Previous pour restored.';haptics.trigger('uiClick');sound('ui');save();}
+  if(name==='restart'){if(model.undoDepth&&!confirm('Restart this commission? Your restoration progress stays saved.'))return;model.reset();session.completed=false;session.hints=0;completed=false;status.textContent='Commission restarted.';haptics.trigger('uiClick');sound('ui');save();}
   if(name==='haptics'){hapticsEnabled=!hapticsEnabled;haptics.setEnabled(hapticsEnabled);writeHapticsEnabled(hapticsEnabled);haptics.trigger(hapticsEnabled?'toggleOn':'toggleOff',true);}
-  if(name==='motion'){model.reducedMotion=!model.reducedMotion;writeReducedMotion(model.reducedMotion);haptics.trigger('uiClick');}
-  updateControls();schedule();
+  if(name==='motion'){model.reducedMotion=!model.reducedMotion;reducedMotionEnabled=model.reducedMotion;writeReducedMotion(model.reducedMotion);haptics.trigger('uiClick');}
+  if(name==='sound'){soundEnabled=!soundEnabled;audio.setEnabled(soundEnabled);writePreference(SOUND_KEY,soundEnabled);if(soundEnabled)void audio.unlock();}
+  if(name==='haptics')writePreference('stilllight.haptics.enabled',hapticsEnabled);
+  if(name==='motion')writePreference('stilllight.motion.reduced',model.reducedMotion);
+  updateControls();refresh();schedule();
+}
+function writePreference(key:string,value:boolean){pendingPreferences.set(key,value);try{localStorage.setItem(key,String(value));pendingPreferences.delete(key);preferenceError=pendingPreferences.size?'A preference could not be saved. Retry saving when storage is available.':null;}catch{preferenceError='This preference works now but could not be saved. Storage is unavailable.';}}
+
+function navigate(name:string){
+ if(!ready||frameGate.isParity())return;void audio.unlock();sound('ui');
+ if(name==='memory'){shell.keepPlayingInMemory();status.textContent='Playing in memory. Open Settings to retry saving.';return;}
+ if(name==='retry'){if(store.recovery==='new'&&!confirm('Start a new save? Unreadable save bytes will stay preserved for recovery.'))return;for(const [k,v] of pendingPreferences)writePreference(k,v);store.save(session.snapshot(),true);storageMessage();return;}
+ if(name==='play'){if(session.awarded.length===3&&session.completed){shell.show('journal');}else{session.start();adoptModel();shell.show('game');status.textContent=session.completed?'Commission complete. Every color is settled.':'Sort each color into a full vessel.';save();}}
+ else if(name==='next'){
+  const roomEnd=session.isReplay||session.id===COMMISSIONS.at(-1)!.id;session.next();adoptModel();shell.show(roomEnd?'home':'game');status.textContent='Sort each color into a full vessel.';save();
+ }else if(name==='back'){shell.back();save();}
+ else if(['home','settings','commissions','journal'].includes(name)){
+  if(shell.screen==='game'){model.restoreState(model.exportState());save();}
+  if(name==='home'){session.home();adoptModel();}
+  shell.show(name as Screen);
+ }
+ refresh();updateControls();viewport.sync();lastRenderedTime=performance.now();renderAt(lastRenderedTime,false,false);schedule();
 }
 
 document.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(b=>b.addEventListener('click',()=>action(b.dataset.action!)));
+document.querySelectorAll<HTMLButtonElement>('[data-nav]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.nav!)));
+document.querySelector('.commission-list')!.addEventListener('click',e=>{const b=(e.target as HTMLElement).closest<HTMLButtonElement>('[data-commission]');if(!b||b.disabled)return;
+ if(session.awarded.includes(b.dataset.commission!)){session.replay(b.dataset.commission!);adoptModel();shell.show('game');refresh();updateControls();viewport.sync();renderAt(performance.now(),false,false);}else{if(session.completed&&session.id!==b.dataset.commission){session.next();adoptModel();}navigate('play');}
+});
 window.addEventListener('keydown',e=>{
-  if(e.repeat||frameGate.isParity()||(e.target instanceof HTMLElement&&e.target.matches('input,textarea,select,[contenteditable]')))return;
+  if(e.repeat||frameGate.isParity()||(!reference&&shell.screen!=='game')||(e.target instanceof HTMLElement&&e.target.matches('input,textarea,select,[contenteditable]')))return;
   const k=e.key.toLowerCase();
   if(k==='z'&&(e.ctrlKey||e.metaKey)){e.preventDefault();action('undo');return;}
   if(e.ctrlKey||e.metaKey||e.altKey)return;
@@ -109,7 +161,11 @@ window.addEventListener('keydown',e=>{
 });
 
 const viewport=new ViewportController(board,s=>renderer.resize(s.width,s.height,s.density),invalidateScene);
+if(!reference)shell.show('home');else shell.show('game');refresh();
 viewport.start();
+window.addEventListener('resize',()=>shell.layout());
+window.addEventListener('pagehide',()=>{if(!frameGate.isParity())save();audio.setBackground(true);});
+document.addEventListener('visibilitychange',()=>{audio.setBackground(document.hidden);if(document.hidden){if(!frameGate.isParity())save();}else if(!frameGate.isParity()){model.restoreState(model.exportState());refresh();renderAt(performance.now(),false,false);schedule();}});
 
 function enterParity(){if(frameGate.isParity())return;frameGate.enterParity();metrics.last=0;}
 function exitParity(){if(!frameGate.isParity())return;frameGate.exitParity();lastRenderedTime=performance.now();renderAt(lastRenderedTime,false,false);if(model.isAnimating())schedule();}
@@ -118,6 +174,7 @@ let lastDebugFrame:ReturnType<typeof snapshotFrame>|null=null;
 function debugStep(now:number){enterParity();const frame=model.sample(now);renderer.render(frame);lastPresentedFrame=frame;lastRenderedTime=now;lastDebugFrame=snapshotFrame(frame);model.advanceAfterFrame(now);return lastDebugFrame;}
 function stats(values:number[]){if(!values.length)return{count:0,mean:0,p95:0,p99:0};const sorted=[...values].sort((a,b)=>a-b),pick=(q:number)=>sorted[Math.min(sorted.length-1,Math.floor((sorted.length-1)*q))];return{count:values.length,mean:values.reduce((a,b)=>a+b,0)/values.length,p95:pick(.95),p99:pick(.99)};}
 (window as any).__STILLLIGHT_PIXI__={action:debugAction,choose:(index:number,now:number)=>{enterParity();model.choose(index,now);},step:debugStep,enterParity,exitParity,isParity:()=>frameGate.isParity(),state:()=>({board:model.board.map(g=>[...g]),selected:model.selected,busy:model.busy}),lastFrame:()=>lastDebugFrame,backend:()=>renderer.backend,metrics:()=>({prep:stats(metrics.prep),render:stats(metrics.render),frameIntervals:stats(metrics.intervals)}),constants:{POUR_MS,UNDO_MS,SELECT_MS,INVALID_MS,SETTLE_MS,HINT_ATTENTION_MS}};
+(window as any).__STILLLIGHT_SESSION__={state:()=>({board:model.board.map(g=>[...g]),selected:model.selected,busy:model.busy,animating:model.isAnimating(),restoring:restorationStarted!==null,completed:session.completed,replay:session.isReplay,screen:shell.screen,id:session.id,feedback:{...feedbackCounts}}),snapshot:()=>session.snapshot()};
 
 ready=true;updateControls();renderAt(lastRenderedTime,false,false);
 }
