@@ -1,5 +1,7 @@
 # P1.3 → P2 ordinary loop candidate — 2026-10-04
 
+Historical first-delivery evidence. Owner subsequently **rejected this initial UI**, including the numbered Home grid/action overlap and generic sheets. The persistence/ordinary-loop checks below remain factual; this record does not establish visual acceptance. Current corrective presentation and evidence: [P2 visual correction](P2_VISUAL_CORRECTION_ACCEPTANCE.md).
+
 Implementation candidate, **not formal P2 Golden acceptance**. Owner accepted the preceding cleanup/fixes (“all good in my testing”) and authorized this bounded stage. One local inline implementer in D:\STILLLIGHT, Worktree OFF; no agents or independent reviewer. Stop for owner loop/feel playtesting in this chat.
 
 Source: clean local/live main `dde49a6cb8f3f453172ffde6e338b67d3a3c649e`, origin `https://github.com/coderboi1520/stilllight-web.git`. Branch `codex/p1-3-p2-ordinary-loop`; core/session/content/audio checkpoint `618ed32`; final implementation `c40c3913b562494e636b235b3aa8ff97a0e29cf1`. Delivery includes the following documentation commit. Final local/live main identity is verified after normal push and supplied in the handoff.

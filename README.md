@@ -2,6 +2,8 @@
 
 An ordinary-only three-commission Moonlit Atelier slice: Home → Play/Continue → sorting → caps and localized restoration → Next → restored room. Validated local saves preserve the accepted board and exact reversible history; completed replay preserves active Continue. Retained PixiJS/WebGL and Canvas consume the same core frames. Accepted transparent glass, parallel pours, numbers behind artwork and native semantic controls remain.
 
+Home is a water-sort game menu with three decorative glasses, a brass Play/Continue and icon navigation. Commissions uses numbered progression seals; Settings and Collection remain native semantic screens. The initial P2 UI was owner-rejected; [corrective visual evidence](docs/progress/P2_VISUAL_CORRECTION_ACCEPTANCE.md) is a candidate awaiting playtest.
+
 Windows: `Start Web Preview.cmd`, or `npm run dev` at [localhost:5179](http://127.0.0.1:5179/). Use existing installed dependencies; for a fresh checkout run `npm ci` once. Build with `npm run build`, then `npm run preview` at [localhost:5180](http://127.0.0.1:5180/).
 
 Current guidance: [work state](WORK_STATE.md), [director constraints](docs/director-plan/STILLIGHT_FINAL_DEVELOPMENT_PLAN.md), [P1.3/P2 candidate evidence](docs/progress/P1_3_P2_ORDINARY_LOOP_ACCEPTANCE.md). Lightwork is cancelled and other new mechanics/modes are held. This candidate stops for owner loop/feel playtesting; P3 and campaign authoring require separate authorization.
@@ -18,6 +20,7 @@ npm run verify:runtime
 $env:STILLLIGHT_URL='http://127.0.0.1:5180'
 npm run verify:smoke
 npm run verify:p2
+npm run verify:p2-visual
 ```
 
 Targeted checks: `verify:viewport`, `verify:context`, `verify:fallback`, `verify:idle-raf`, `verify:freeze`, `verify:pour`, `verify:glass`, `verify:routes`. `verify:fast` runs build/tests; `verify:all` adds runtime and visual states. Browser checks use Playwright with installed Chrome/Edge/Chromium; `CHROMIUM_PATH` selects an executable and `STILLLIGHT_URL` reuses a server. Diagnostics go to ignored `artifacts/verification/`.
