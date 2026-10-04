@@ -7,6 +7,7 @@ import {configureAssetDensity} from './assets.ts';
 import {backdropLayout} from '../sceneBackdrop.ts';
 import {restorationArtwork} from '../restoration.ts';
 import {makeVesselNumbers,NUMBER_HEIGHT,NUMBER_WIDTH,vesselNumberLayout} from '../vesselNumbers.ts';
+import {workbenchProps,type Presentation} from '../workbench.ts';
 
 export class PixiRenderer{
   readonly backend='webgl' as const;
@@ -21,6 +22,11 @@ export class PixiRenderer{
   private initialized=false;
   private movingOrder='';
   private density=1;
+  private presentation:Presentation='game';
+  private width=W;
+  private height=H;
+  setPresentation(mode:Presentation){this.presentation=mode;this.layoutScene();}
+  private layoutScene(){this.scene.scale.set(this.width/W,this.presentation==='workbench'?this.width/W:this.height/H);this.scene.y=this.presentation==='workbench'?0:SCENE_TOP_PADDING*this.height/H;this.numbers.visible=this.presentation==='game';}
   private capTexture:Texture|null=null;
   private backdrop:Sprite|null=null;
   // Keep changing restoration textures outside the authored glass batches.
@@ -85,8 +91,7 @@ export class PixiRenderer{
     const next=Math.max(1,Math.min(density||1,2));
     if(Math.abs(next-this.density)>1e-6){this.density=next;configureAssetDensity(next);this.rebuildViews(true);}
     this.app.renderer.resize(Math.max(1,width),Math.max(1,height),next);
-    this.scene.scale.set(width/W,height/H);
-    this.scene.y=SCENE_TOP_PADDING*height/H;
+    this.width=width;this.height=height;this.layoutScene();
     for(let i=0;i<this.numbers.children.length;i++){const p=vesselNumberLayout(i,width,height);this.numbers.children[i].position.set(p.x,p.y);}
     if(this.backdrop&&this.host){const layout=backdropLayout(this.host,width,height,this.backdrop.texture.width,this.backdrop.texture.height);this.backdrop.visible=!!layout;if(layout){this.backdrop.position.set(layout.x,layout.y);this.backdrop.width=layout.width;this.backdrop.height=layout.height;}}
     this.restoration.visible=this.backdrop?.visible??false;
@@ -105,7 +110,12 @@ export class PixiRenderer{
 
   render(frame:RenderFrame){
     if(!this.initialized||!this.glasses)return;
-    for(let i=0;i<this.glasses.length;i++)this.glasses[i].update(frame.glasses[i]);
+    for(let i=0;i<this.glasses.length;i++){this.glasses[i].root.visible=this.presentation==='game';this.glasses[i].root.scale.set(1);this.glasses[i].update(frame.glasses[i]);}
+    if(this.presentation==='workbench'){
+      for(const p of workbenchProps(frame)){const root=this.glasses[p.index].root;root.visible=true;root.position.set(p.x,p.y);root.scale.set(p.scale);}
+      for(const stream of this.streams)stream.root.visible=false;
+      this.app.renderer.render(this.app.stage);this.destroyRetiredViews();return;
+    }
     this.ensureDrawOrder(frame);for(let i=0;i<this.streams.length;i++)this.streams[i].update(frame.streams[i]??null);this.app.renderer.render(this.app.stage);this.destroyRetiredViews();
   }
 

@@ -50,7 +50,7 @@ const feedbackCounts={select:0,contact:0,invalid:0,complete:0,ui:0};
 function sound(event:AudioEvent,now=performance.now()){if(!frameGate.isParity()&&!document.hidden){feedbackCounts[event]++;audio.play(event,now);}}
 function storageMessage(){shell.storageError(preferenceError??store.error,store.recovery==='backup'?'Recover save':store.recovery==='new'?'Start a new save':'Retry saving');}
 function save(){if(!reference){store.save(session.snapshot());storageMessage();}}
-function refresh(){if(!reference){shell.update(session);storageMessage();}}
+function refresh(){renderer.setPresentation(!reference&&shell.screen==='home'?'workbench':'game');if(!reference){shell.update(session);storageMessage();}}
 function adoptModel(){model=session.model;model.reducedMotion=reducedMotionEnabled;completed=session.completed;restorationStarted=null;}
 const status=document.querySelector<HTMLElement>('.status')!;
 const control=(name:string)=>document.querySelector<HTMLButtonElement>(`[data-action="${name}"]`)!;

@@ -2,6 +2,7 @@ import type {RenderFrame} from '../core/RenderFrame.ts';
 import {CanvasRenderer} from './CanvasRenderer.ts';
 import {PixiRenderer} from './pixi/PixiRenderer.ts';
 import {selectBackend,type Backend} from './backendPolicy.ts';
+import type {Presentation} from './workbench.ts';
 
 export class StageRenderer{
   private renderer:PixiRenderer|CanvasRenderer|null=null;
@@ -14,6 +15,7 @@ export class StageRenderer{
   }
   resize(width:number,height:number,density:number){this.renderer?.resize(width,height,density);}
   render(frame:RenderFrame){this.renderer?.render(frame);}
+  setPresentation(mode:Presentation){this.renderer?.setPresentation(mode);}
   setRestoration(count:number,alpha=1){this.renderer?.setRestoration(count,alpha);}
   destroy(){this.renderer?.destroy();}
 }

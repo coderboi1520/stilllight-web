@@ -26,6 +26,10 @@ export async function run(harness) {
       if (!expectPresented(first)) throw new Error(`${label}: incorrect boundary presentation`);
       const canvas = page.locator('#pixi-host canvas');
       const original = await page.evaluate(() => { const c = document.querySelector('#pixi-host canvas'); return [c.width, c.height]; });
+      // Read back the native canvas before each composed capture. This flushes
+      // Chromium's GPU readback consistently and also verifies the renderer's
+      // own pixels independently of fractional CSS screenshot compositing.
+      const nativeBefore = await canvas.evaluate(c => c.toDataURL());
       const before = await canvas.screenshot();
       const painted = await page.evaluate(async png => { const image = new Image(); image.src = png; await image.decode(); const copy = document.createElement('canvas'); copy.width = image.width; copy.height = image.height; const context = copy.getContext('2d'); context.drawImage(image, 0, 0); const pixels = context.getImageData(0, 0, copy.width, copy.height).data; let count = 0; for (let i = 0; i < pixels.length; i += 4) if (pixels[i] > 45 || pixels[i + 1] > 55 || pixels[i + 2] > 65) count++; return count; }, `data:image/png;base64,${before.toString('base64')}`);
       if (painted === 0) throw new Error(`${label}: blank presented scene`);
@@ -34,11 +38,12 @@ export async function run(harness) {
       await page.setViewportSize({ width: 400, height: 620 });
       await page.waitForFunction(([w, h]) => { const c = document.querySelector('#pixi-host canvas'); return c.width === w && c.height === h; }, original);
       const second = await page.evaluate(() => { const app = window.__STILLLIGHT_PIXI__; return { state: app.state(), frame: app.lastFrame() }; });
+      const nativeAfter = await canvas.evaluate(c => c.toDataURL());
       const after = await canvas.screenshot();
-      if (JSON.stringify(first) !== JSON.stringify(second) || digest(before) !== digest(after)) {
+      if (JSON.stringify(first) !== JSON.stringify(second) || nativeBefore !== nativeAfter || digest(before) !== digest(after)) {
         await page.screenshot({path:`${dir}/${label}-after-failure.png`});
         const fs=await import('node:fs/promises');await fs.writeFile(`${dir}/${label}-before-canvas.png`,before);await fs.writeFile(`${dir}/${label}-after-canvas.png`,after);
-        throw new Error(`${label}: presented frame changed on resize invalidation; data=${JSON.stringify(first) === JSON.stringify(second) ? 'stable' : 'changed'}, image=${digest(before) === digest(after) ? 'stable' : 'changed'}`);
+        throw new Error(`${label}: presented frame changed on resize invalidation; data=${JSON.stringify(first) === JSON.stringify(second) ? 'stable' : 'changed'}, native=${nativeBefore === nativeAfter ? 'stable' : 'changed'}, image=${digest(before) === digest(after) ? 'stable' : 'changed'}`);
       }
       const next = await page.evaluate(now => { const app = window.__STILLLIGHT_PIXI__; app.step(now); return { state: app.state(), frame: app.lastFrame() }; }, presentedAt + 1);
       if (!expectNext(next)) throw new Error(`${label}: next explicit step did not expose transition`);

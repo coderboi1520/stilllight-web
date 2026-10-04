@@ -5,6 +5,7 @@ import {backdropLayout} from './sceneBackdrop.ts';
 import {restorationArtwork} from './restoration.ts';
 import {drawInteriorGlassPath,makeGlassArtwork} from './glassMaterial.ts';
 import {makeVesselNumbers,NUMBER_HEIGHT,NUMBER_WIDTH,vesselNumberLayout} from './vesselNumbers.ts';
+import {workbenchProps,type Presentation} from './workbench.ts';
 
 const DEPTH_COLORS=COLORS.map(color=>`#${[1,3,5].map(at=>Math.round(parseInt(color.slice(at,at+2),16)*.87).toString(16).padStart(2,'0')).join('')}`);
 
@@ -26,6 +27,8 @@ export class CanvasRenderer{
   private host:HTMLElement|null=null;
   private restoration=0;
   private restorationAlpha=1;
+  private presentation:Presentation='game';
+  setPresentation(mode:Presentation){this.presentation=mode;}
   setRestoration(count:number,alpha=1){this.restoration=count;this.restorationAlpha=alpha;}
 
   async init(host:HTMLElement){this.host=host;this.capImage=new Image();this.capImage.src='/assets/pumpkin-cap.png';this.backdropImage=new Image();this.backdropImage.src='/assets/moonlit-studio.png';await Promise.all([this.capImage.decode(),this.backdropImage.decode()]);this.canvas.setAttribute('aria-hidden','true');host.appendChild(this.canvas);}
@@ -75,6 +78,10 @@ export class CanvasRenderer{
   render(frame:RenderFrame){
     const ctx=this.ctx,sx=this.width/W,sy=this.height/H;ctx.setTransform(this.density,0,0,this.density,0,0);ctx.clearRect(0,0,this.width,this.height);ctx.fillStyle='#071219';ctx.fillRect(0,0,this.width,this.height);
     if(this.backdrop&&this.backdropImage){const b=this.backdrop;ctx.drawImage(this.backdropImage,b.x,b.y,b.width,b.height);ctx.fillStyle='rgba(0,0,0,.333333)';ctx.fillRect(0,0,this.width,this.height);ctx.drawImage(restorationArtwork(Math.max(0,this.restoration-1)),b.x,b.y,b.width,b.height);ctx.globalAlpha=this.restorationAlpha;ctx.drawImage(restorationArtwork(this.restoration,true),b.x,b.y,b.width,b.height);ctx.globalAlpha=1;}
+    if(this.presentation==='workbench'){
+      ctx.setTransform(this.density*sx,0,0,this.density*sx,0,0);
+      for(const p of workbenchProps(frame)){const glass=frame.glasses[p.index];ctx.save();ctx.translate(p.x,p.y);ctx.scale(p.scale,p.scale);ctx.translate(-glass.pose.x,-glass.pose.y);this.glass(glass);ctx.restore();}return;
+    }
     if(frame.glasses.length>2&&this.numbers.length!==frame.glasses.length)this.numbers=makeVesselNumbers(frame.glasses.length);
     for(let i=0;i<this.numbers.length;i++){const p=vesselNumberLayout(i,this.width,this.height);ctx.drawImage(this.numbers[i],p.x,p.y,NUMBER_WIDTH,NUMBER_HEIGHT);}
     ctx.setTransform(this.density*sx,0,0,this.density*sy,0,0);ctx.translate(0,SCENE_TOP_PADDING);
