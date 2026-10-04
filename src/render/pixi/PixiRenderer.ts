@@ -1,16 +1,19 @@
-import { Application,Assets,Container,Sprite } from 'pixi.js';
-import type {Texture} from 'pixi.js';
+import { Application,Assets,Container,Sprite,Texture } from 'pixi.js';
 import { H,SCENE_TOP_PADDING,W } from '../../core/constants.ts';
 import type {RenderFrame} from '../../core/RenderFrame.ts';
 import {GlassView} from './GlassView.ts';
 import {StreamView} from './StreamView.ts';
 import {configureAssetDensity} from './assets.ts';
 import {backdropLayout} from '../sceneBackdrop.ts';
+import {makeVesselNumbers,NUMBER_HEIGHT,NUMBER_WIDTH,vesselNumberLayout} from '../vesselNumbers.ts';
 
 export class PixiRenderer{
   readonly backend='webgl' as const;
   app=new Application();
   private scene=new Container();
+  // Keep label textures out of glass batches so frozen redraws stay byte-exact.
+  private numbers=new Container({isRenderGroup:true});
+  private numberTextures:Texture[]=[];
   private glasses:GlassView[]|null=null;
   private streams:StreamView[]=[];
   private retiredViews:(GlassView|StreamView)[]=[];
@@ -42,7 +45,9 @@ export class PixiRenderer{
     this.capTexture=await Assets.load<Texture>('/assets/pumpkin-cap.png');
     this.backdrop=new Sprite(await Assets.load<Texture>('/assets/moonlit-studio.png'));this.backdrop.tint='#aaaaaa';
     host.appendChild(this.app.canvas);
-    this.app.stage.addChild(this.backdrop,this.scene);
+    this.app.stage.addChild(this.backdrop,this.numbers,this.scene);
+    this.numberTextures=makeVesselNumbers(this.vesselCount).map(canvas=>Texture.from(canvas));
+    for(const texture of this.numberTextures){const number=new Sprite(texture);number.width=NUMBER_WIDTH;number.height=NUMBER_HEIGHT;this.numbers.addChild(number);}
     this.rebuildViews(false);
     this.app.canvas.addEventListener('webglcontextrestored',this.restoreHandler);
     this.initialized=true;
@@ -69,6 +74,7 @@ export class PixiRenderer{
     this.app.renderer.resize(Math.max(1,width),Math.max(1,height),next);
     this.scene.scale.set(width/W,height/H);
     this.scene.y=SCENE_TOP_PADDING*height/H;
+    for(let i=0;i<this.numbers.children.length;i++){const p=vesselNumberLayout(i,width,height);this.numbers.children[i].position.set(p.x,p.y);}
     if(this.backdrop&&this.host){const layout=backdropLayout(this.host,width,height,this.backdrop.texture.width,this.backdrop.texture.height);this.backdrop.visible=!!layout;if(layout){this.backdrop.position.set(layout.x,layout.y);this.backdrop.width=layout.width;this.backdrop.height=layout.height;}}
   }
 
@@ -88,5 +94,5 @@ export class PixiRenderer{
     this.ensureDrawOrder(frame);for(let i=0;i<this.streams.length;i++)this.streams[i].update(frame.streams[i]??null);this.app.renderer.render(this.app.stage);this.destroyRetiredViews();
   }
 
-  destroy(){this.app.canvas?.removeEventListener('webglcontextrestored',this.restoreHandler);this.glasses?.forEach(view=>view.destroy());this.streams.forEach(view=>view.destroy());this.glasses=null;this.streams.length=0;this.destroyRetiredViews();try{this.app.destroy(true,{children:true});}catch{}this.initialized=false;}
+  destroy(){this.app.canvas?.removeEventListener('webglcontextrestored',this.restoreHandler);this.glasses?.forEach(view=>view.destroy());this.streams.forEach(view=>view.destroy());this.glasses=null;this.streams.length=0;this.destroyRetiredViews();try{this.app.destroy(true,{children:true});}catch{}for(const texture of this.numberTextures)texture.destroy(true);this.numberTextures.length=0;this.initialized=false;}
 }

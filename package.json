@@ -1,5 +1,5 @@
 {
-  "name": "stilllight-two-glass-pixi-m1",
+  "name": "stilllight-web",
   "private": true,
   "version": "1.0.1",
   "type": "module",
@@ -7,18 +7,20 @@
     "dev": "vite --host 127.0.0.1 --port 5179 --strictPort",
     "build": "tsc -p tsconfig.json && vite build",
     "test": "node --experimental-strip-types --test tests/*.test.mts tests/*.test.mjs",
-    "test:reference": "node --test reference/original/tests/*.test.mjs",
-    "parity:capture": "node scripts/capture-parity.mjs",
-    "verify:fast": "npm run build && npm test && npm run test:reference",
+    "verify:fast": "npm run build && npm test",
     "verify:viewport": "node scripts/verification/verify-viewport-dpr.mjs",
     "verify:context": "node scripts/verification/verify-context-restore.mjs",
     "verify:fallback": "node scripts/verification/verify-canvas-fallback.mjs",
     "verify:idle-raf": "node scripts/verification/verify-idle-raf.mjs",
-    "verify:parity": "node scripts/verification/verify-parity-freeze.mjs",
     "verify:pour": "node scripts/verification/verify-pour-states.mjs",
     "verify:runtime": "node scripts/verify-runtime.mjs",
     "verify:visual": "node scripts/verify-visual.mjs",
-    "verify:m1": "node scripts/verify-m1.mjs"
+    "preview": "vite preview --host 127.0.0.1 --port 5180 --strictPort",
+    "verify:freeze": "node scripts/verification/verify-frame-freeze.mjs",
+    "verify:all": "node scripts/verify-all.mjs",
+    "verify:smoke": "node scripts/verification/verify-ordinary-fixes.mjs && node scripts/verification/verify-transparent-glass.mjs && node scripts/verification/verify-vessel-labels.mjs && npm run verify:routes",
+    "verify:glass": "node scripts/verification/verify-transparent-glass.mjs",
+    "verify:routes": "node scripts/verification/verify-retired-routes.mjs"
   },
   "dependencies": {
     "pixi.js": "8.18.0"

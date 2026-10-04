@@ -7,10 +7,11 @@ const read=rel=>fs.readFileSync(new URL(rel,import.meta.url),'utf8');
 test('glass wall/glow stay open while body, mask and shadow close on the curved front-rim boundary',()=>{
   const glass=read('../src/render/pixi/GlassView.ts');
   const assets=read('../src/render/pixi/assets.ts');
+  const material=read('../src/render/glassMaterial.ts');
   const openContext=glass.slice(glass.indexOf('function openWallContext'),glass.indexOf('function outline'));
   const interiorContext=glass.slice(glass.indexOf('function interiorGlassContext'),glass.indexOf('function openWallContext'));
-  const openGlow=assets.slice(assets.indexOf('function drawOpenWallPath'),assets.indexOf('function drawRim'));
-  const interiorShadow=assets.slice(assets.indexOf('function drawInteriorGlassPath'),assets.indexOf('function drawOpenWallPath'));
+  const openGlow=material.slice(material.indexOf('function drawOpenWallPath'),material.indexOf('function drawRim'));
+  const interiorShadow=material.slice(material.indexOf('function drawInteriorGlassPath'),material.indexOf('function drawOpenWallPath'));
   assert.doesNotMatch(openContext,/closePath/);
   assert.match(interiorContext,/closePath/);
   assert.doesNotMatch(openGlow,/closePath/);
@@ -22,8 +23,10 @@ test('glass wall/glow stay open while body, mask and shadow close on the curved 
   assert.match(glass,/private body=new Graphics\(interiorGlassContext\(\)\)/);
   assert.match(glass,/private clip=new Graphics\(interiorGlassContext\(\)\)\.fill\(0xffffff\)/);
   assert.match(assets,/drawOpenWallPath\(ctx\);\s*ctx\.stroke\(\);\s*drawRim/);
-  const shadow=assets.slice(assets.indexOf('export function makeBodyShadowTexture'),assets.indexOf('export function makeGlowTexture'));
+  const shadow=material.slice(material.indexOf('export function drawBodyShadow'),material.indexOf('export function drawGlassRim'));
   assert.match(shadow,/drawInteriorGlassPath\(ctx\);\s*ctx\.fill\(\)/);
+  assert.match(shadow,/globalCompositeOperation='destination-out'/);
+  assert.match(assets,/makeBodyShadowTexture\(\)\{return canvasTexture\(drawBodyShadow\)/);
   assert.doesNotMatch(glass,/closedGlassContext/);
   assert.doesNotMatch(assets,/drawClosedGlassPath/);
 });

@@ -32,21 +32,25 @@ test('Canvas composes each glass once, shines inside its unrotated clip, and use
   const ctx={...state,
     save(){stack.push({rotation:this.rotation,clipped:this.clipped,fillStyle:this.fillStyle,strokeStyle:this.strokeStyle,lineWidth:this.lineWidth,shadowBlur:this.shadowBlur,shadowColor:this.shadowColor});},
     restore(){Object.assign(this,stack.pop());},translate(){},rotate(angle){this.rotation+=angle;},setTransform(){this.rotation=0;},clearRect(){},
-    beginPath(){this.path=null;},moveTo(){},lineTo(){},quadraticCurveTo(){},closePath(){},
+    beginPath(){this.path=null;},moveTo(){},lineTo(){},quadraticCurveTo(){},bezierCurveTo(){},scale(){},closePath(){},
     clip(){this.clipped=true;calls.push({kind:'clip'});},
     fill(){calls.push({kind:'fill',style:this.fillStyle,shadow:this.shadowColor,blur:this.shadowBlur});},
     fillRect(x,y,w,h){calls.push({kind:'fillRect',x,y,w,h,style:this.fillStyle,clipped:this.clipped,rotation:this.rotation});},
+    drawImage(image,x,y,w,h){calls.push({kind:'image',image,x,y,w,h,clipped:this.clipped,rotation:this.rotation});},
     ellipse(){this.path='rim';},stroke(){calls.push({kind:'stroke',path:this.path,width:this.lineWidth,blur:this.shadowBlur});},
+    createRadialGradient(...args){return this.createLinearGradient(...args);},
     createLinearGradient(...args){const gradient={args,stops:[],addColorStop(at,color){this.stops.push([at,color]);}};calls.push({kind:'gradient',gradient});return gradient;}
   };
   const originalDocument=globalThis.document;globalThis.document={createElement:()=>({getContext:()=>ctx})};
   try{
-    const renderer=new CanvasRenderer(),model=new StilllightModel();model.startPour(T);const frame=model.sample(T+500);renderer.render(frame);
-    const body=calls.filter(c=>c.kind==='fill'&&c.style==='rgba(12,31,42,.78)');assert.equal(body.length,2);assert.ok(body.every(c=>c.shadow==='#000'&&c.blur===7));
-    const firstBody=calls.findIndex(c=>c.kind==='fill'&&c.style==='rgba(12,31,42,.78)'),firstClip=calls.findIndex(c=>c.kind==='clip'),firstShine=calls.findIndex(c=>c.kind==='fillRect'&&c.style?.args?.[0]===-34),firstWall=calls.findIndex(c=>c.kind==='stroke'&&c.width===1.6);assert.ok(firstBody<firstClip&&firstClip<firstShine&&firstShine<firstWall);
-    const shines=calls.filter(c=>c.kind==='fillRect'&&c.style?.args?.[0]===-34);assert.equal(shines.length,2);
-    for(const shine of shines){assert.deepEqual([shine.x,shine.y,shine.w,shine.h],[-34,0,68,158]);assert.equal(shine.clipped,true);assert.deepEqual(shine.style.args,[-34,0,34,0]);assert.deepEqual(shine.style.stops,[[0,'#ffffff38'],[.18,'#ffffff07'],[.86,'#ffffff00'],[1,'#ffffff34']]);}
-    assert.equal(shines[0].rotation,frame.glasses[1].pose.angle);assert.equal(shines[1].rotation,frame.glasses[0].pose.angle);
+    const renderer=new CanvasRenderer(),model=new StilllightModel();model.startPour(T);const frame=model.sample(T+500);calls.length=0;renderer.render(frame);
+    const body=calls.filter(c=>c.kind==='fill'&&c.style==='rgba(16,39,49,.18)');assert.equal(body.length,2);
+    assert.ok(!calls.some(c=>c.kind==='fill'&&c.style==='rgba(12,31,42,.78)'),'no opaque shadow body is painted over the backdrop');
+    const firstBody=calls.findIndex(c=>c.kind==='fill'&&c.style==='rgba(16,39,49,.18)'),firstClip=calls.findIndex(c=>c.kind==='clip'),firstShine=calls.findIndex(c=>c.kind==='image'&&c.clipped),firstWall=calls.findIndex(c=>c.kind==='stroke'&&c.width===1.25);assert.ok(firstBody<firstClip&&firstClip<firstShine&&firstShine<firstWall);
+    const shines=calls.filter(c=>c.kind==='image'&&c.clipped);assert.equal(shines.length,6,'base, reflection and edge each compose once per glass');
+    for(const shine of shines){assert.deepEqual([shine.y,shine.w,shine.h],[0,68,158]);assert.equal(shine.clipped,true);}
+    assert.ok(shines.slice(0,3).every(s=>s.rotation===frame.glasses[1].pose.angle));assert.ok(shines.slice(3).every(s=>s.rotation===frame.glasses[0].pose.angle));
+    const artwork=shines.map(s=>s.image);calls.length=0;renderer.render(frame);assert.deepEqual(calls.filter(c=>c.kind==='image'&&c.clipped).map(s=>s.image),artwork,'artwork canvases are retained between frames');
     calls.length=0;model.reset();model.invalid(T+1000);renderer.render(model.sample(T+1100));
     const invalidRims=calls.filter(c=>c.kind==='stroke'&&c.path==='rim'&&c.blur===12);assert.equal(invalidRims.length,2);assert.ok(invalidRims.every(c=>c.width===3));
     assert.ok(calls.some(c=>c.kind==='stroke'&&c.path==='rim'&&c.blur===0&&c.width===1.4));

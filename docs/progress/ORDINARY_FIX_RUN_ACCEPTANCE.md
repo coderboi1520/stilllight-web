@@ -1,5 +1,7 @@
 # Ordinary Fix Run — 2026-10-04
 
+Historical verification for delivery `1460a8657913c9a5d67f6bb9529b975738d3d96c`. Subsequent owner-authorized cleanup retires original-reference commands, adds PF04 transparent Canvas glass, removes the subsequently rejected vessel-number focus box and places numeric artwork behind rendered vessels/streams; see `CURRENT_GAME_CLEANUP_ACCEPTANCE.md` and `WORK_STATE.md` for current state. Results below remain factual evidence of this earlier run.
+
 Delivered scope: PF01 keyboard focus, PF02 removal of rejected liquid symbols/legend, PF03 concurrent ordinary pours, and necessary regressions. Automated qualification only; owner gameplay/appearance acceptance is pending.
 
 Source: clean local and live GitHub main `a01d7d8b9248fb0c9f71df886ccd32a59c8d1ca9`, origin `https://github.com/coderboi1520/stilllight-web.git`. Implementation result: `393f9b3b5f80ccc3f894577ca318c44611a7f6f5`, on `codex/ordinary-fix-run`. Delivery also includes the following documentation commit containing this record; final main identity is read back locally and from `git ls-remote origin refs/heads/main` after normal push. No history rewrite, dependency changes, or original-reference edits.

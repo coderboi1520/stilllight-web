@@ -2,10 +2,11 @@ import { COLORS,COMPLETION_ACCENTS,GLASS_BOTTOM,H,SCENE_TOP_PADDING,W } from '..
 import type {GlassFrame,LiquidLayerFrame,RenderFrame,StreamFrame} from '../core/RenderFrame.ts';
 import {CAP_ART_SCALE,CAP_ART_WIDTH,CAP_SOURCE_BOTTOM} from './capArtwork.ts';
 import {backdropLayout} from './sceneBackdrop.ts';
+import {drawInteriorGlassPath,makeGlassArtwork} from './glassMaterial.ts';
+import {makeVesselNumbers,NUMBER_HEIGHT,NUMBER_WIDTH,vesselNumberLayout} from './vesselNumbers.ts';
 
 const DEPTH_COLORS=COLORS.map(color=>`#${[1,3,5].map(at=>Math.round(parseInt(color.slice(at,at+2),16)*.87).toString(16).padStart(2,'0')).join('')}`);
 
-function closedGlassPath(ctx:CanvasRenderingContext2D){ctx.beginPath();ctx.moveTo(-33,0);ctx.lineTo(-33,130);ctx.quadraticCurveTo(-33,154,-12,156);ctx.lineTo(12,156);ctx.quadraticCurveTo(33,154,33,130);ctx.lineTo(33,0);ctx.closePath();}
 function openGlassPath(ctx:CanvasRenderingContext2D){ctx.beginPath();ctx.moveTo(-33,0);ctx.lineTo(-33,130);ctx.quadraticCurveTo(-33,154,-12,156);ctx.lineTo(12,156);ctx.quadraticCurveTo(33,154,33,130);ctx.lineTo(33,0);}
 function outline(ctx:CanvasRenderingContext2D,color:string,width:number,rim:string,rimWidth:number){ctx.strokeStyle=color;ctx.lineWidth=width;openGlassPath(ctx);ctx.stroke();ctx.beginPath();ctx.ellipse(0,0,33,4.5,0,0,Math.PI*2);ctx.strokeStyle=rim;ctx.lineWidth=rimWidth;ctx.stroke();}
 
@@ -13,6 +14,8 @@ export class CanvasRenderer{
   readonly backend='canvas' as const;
   private canvas=document.createElement('canvas');
   private ctx=this.canvas.getContext('2d')!;
+  private glassArtwork=makeGlassArtwork();
+  private numbers:HTMLCanvasElement[]=[];
   private width=W;
   private height=H;
   private density=1;
@@ -37,17 +40,19 @@ export class CanvasRenderer{
 
   private glass(frame:GlassFrame){
     const ctx=this.ctx;ctx.save();ctx.translate(frame.pose.x,frame.pose.y+frame.completion.recoilY);ctx.rotate(frame.pose.angle);
-    ctx.save();ctx.shadowColor='#000';ctx.shadowBlur=7;ctx.fillStyle='rgba(12,31,42,.78)';closedGlassPath(ctx);ctx.fill();ctx.restore();
-    ctx.save();closedGlassPath(ctx);ctx.clip();
+    ctx.drawImage(this.glassArtwork.shadow,-90,-36,180,230);
+    ctx.fillStyle='rgba(16,39,49,.18)';drawInteriorGlassPath(ctx);ctx.fill();
+    ctx.save();drawInteriorGlassPath(ctx);ctx.clip();
     ctx.save();ctx.rotate(frame.relativeLiquidRotation);for(let i=0;i<frame.layers.length;i++){const layer=frame.layers[i],next=frame.layers[i+1];this.layer(ctx,layer,!next||next.color!==layer.color);}
     if(frame.response){const {local,tangent}=frame.response.contact,intensity=frame.response.intensity;ctx.save();ctx.translate(local.x,local.y);ctx.rotate(Math.atan2(tangent.y,tangent.x));ctx.strokeStyle='#fff';ctx.lineWidth=.9;ctx.globalAlpha=.14*intensity;ctx.beginPath();ctx.ellipse(0,.6,frame.response.spread,2.1,0,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#fff';ctx.globalAlpha=.22*intensity;ctx.beginPath();ctx.ellipse(0,0,3.2,1.1,0,0,Math.PI*2);ctx.fill();ctx.restore();}
     ctx.restore();
-    const shine=ctx.createLinearGradient(-34,0,34,0);shine.addColorStop(0,'#ffffff38');shine.addColorStop(.18,'#ffffff07');shine.addColorStop(.86,'#ffffff00');shine.addColorStop(1,'#ffffff34');ctx.fillStyle=shine;ctx.fillRect(-34,0,68,158);
+    ctx.drawImage(this.glassArtwork.base,-34,0,68,158);
+    ctx.drawImage(this.glassArtwork.reflection,-34+Math.max(-2,Math.min(2,-Math.sin(frame.pose.angle)*2)),0,68,158);
+    ctx.drawImage(this.glassArtwork.edge,-34,0,68,158);
     ctx.restore();
     const glow=frame.invalid?'#ff8e94':frame.hintRole==='source'?'#f5d38e':frame.hintRole==='target'?'#83e0d4':frame.selected?'#f5d38e':null;
     if(glow){ctx.save();ctx.globalAlpha=frame.invalid?.55*frame.invalidStrength:frame.hintRole?frame.hintStrength:1;ctx.shadowColor=glow;ctx.shadowBlur=frame.invalid?12:16;outline(ctx,glow,frame.invalid?3:2.4,glow,frame.invalid?3:2.4);ctx.restore();}
-    if(frame.invalid){ctx.save();ctx.globalAlpha=.65*frame.invalidStrength;outline(ctx,'#ff8e94',3,'#ffb0b5',1.4);ctx.restore();}else if(frame.selected)outline(ctx,'#f5d38e',1.6,'#f9e1ae',1.8);else outline(ctx,'rgba(200,225,237,.61)',1.6,'rgba(230,243,248,.78)',1.4);
-    ctx.strokeStyle='rgba(255,255,255,.32)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-25,14);ctx.lineTo(-25,123);ctx.stroke();
+    if(frame.invalid){ctx.save();ctx.globalAlpha=.65*frame.invalidStrength;outline(ctx,'#ff8e94',3,'#ffb0b5',1.4);ctx.restore();}else if(frame.selected)outline(ctx,'#f5d38e',1.6,'#f9e1ae',1.8);else{ctx.strokeStyle='#b9d8e66f';ctx.lineWidth=1.25;openGlassPath(ctx);ctx.stroke();ctx.drawImage(this.glassArtwork.rim,-90,-36,180,230);}
     if(frame.cap.visible&&this.capImage){ctx.save();ctx.translate(0,frame.cap.y);ctx.rotate(frame.cap.rotation);ctx.scale(frame.cap.scaleX,frame.cap.scaleY);ctx.globalAlpha=frame.cap.alpha;
       ctx.drawImage(this.capImage,-CAP_ART_WIDTH/2,-CAP_SOURCE_BOTTOM*CAP_ART_SCALE,CAP_ART_WIDTH,CAP_ART_WIDTH);
       ctx.restore();}
@@ -66,6 +71,8 @@ export class CanvasRenderer{
   render(frame:RenderFrame){
     const ctx=this.ctx,sx=this.width/W,sy=this.height/H;ctx.setTransform(this.density,0,0,this.density,0,0);ctx.clearRect(0,0,this.width,this.height);ctx.fillStyle='#071219';ctx.fillRect(0,0,this.width,this.height);
     if(this.backdrop&&this.backdropImage){const b=this.backdrop;ctx.drawImage(this.backdropImage,b.x,b.y,b.width,b.height);ctx.fillStyle='rgba(0,0,0,.333333)';ctx.fillRect(0,0,this.width,this.height);}
+    if(frame.glasses.length>2&&this.numbers.length!==frame.glasses.length)this.numbers=makeVesselNumbers(frame.glasses.length);
+    for(let i=0;i<this.numbers.length;i++){const p=vesselNumberLayout(i,this.width,this.height);ctx.drawImage(this.numbers[i],p.x,p.y,NUMBER_WIDTH,NUMBER_HEIGHT);}
     ctx.setTransform(this.density*sx,0,0,this.density*sy,0,0);ctx.translate(0,SCENE_TOP_PADDING);
     for(const glass of frame.glasses)if(!glass.moving)this.glass(glass);
     for(const glass of frame.glasses)if(glass.moving)this.glass(glass);

@@ -1,5 +1,7 @@
 # P0 + P1.1 ordinary commission acceptance
 
+Historical delivery evidence. Current instructions are in `WORK_STATE.md` and the consolidated director plan. Original/oracle comparison pages and reference/capture commands below were retired by the owner-authorized 2026-10-04 cleanup; current core fixtures/manual frame verification remain. PF01–PF04 supersede the marker/opaque Canvas presentation described here. Lightwork is cancelled; historical next commands do not authorize it.
+
 Delivered scope: one playable ordinary commission. Stop before P1.2 Lightwork, Home/campaign expansion, commerce, and full board save/resume.
 
 ## Identity and recovery

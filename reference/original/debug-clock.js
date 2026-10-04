@@ -1,1 +1,0 @@
-let now=10000;let pending=null;let id=0;Object.defineProperty(performance,'now',{configurable:true,value:()=>now});window.requestAnimationFrame=(cb)=>{pending=cb;return++id;};window.cancelAnimationFrame=()=>{pending=null;};window.__STILLLIGHT_CLOCK__={set(t){now=t;},step(t){now=t;const cb=pending;pending=null;if(cb)cb(t);},hasPending(){return!!pending;}};

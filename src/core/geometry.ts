@@ -23,7 +23,6 @@ export function movingPose(source:number,target:number,progress:number,remaining
 }
 export function selectedPose(index:number,progress=1,out:Pose=poseOut()):Pose{const x=80+(index%3)*120,y=130+Math.floor(index/3)*242,t=clamp01(progress),lift=SELECT_LIFT*easeOutCubic(t),settle=t<1?Math.sin(t*Math.PI*3.2)*1.8*(1-t):0;out.x=x;out.y=y-lift+settle;out.angle=0;return out;}
 export function selectedPoseDerivative(progress:number,out:Pose=poseOut()):Pose{out.x=0;out.y=0;out.angle=0;if(progress<0||progress>=1)return out;const t=clamp01(progress),k=Math.PI*3.2,dLift=3*SELECT_LIFT*(1-t)*(1-t),dSettle=1.8*(k*Math.cos(k*t)*(1-t)-Math.sin(k*t));out.y=-dLift+dSettle;return out;}
-export function invalidPose(index:number,progress:number,direction:number,out:Pose=poseOut()):Pose{const hx=80+(index%3)*120,hy=130+Math.floor(index/3)*242,p=clamp01(progress),env=Math.pow(1-p,1.35),osc=Math.sin(p*Math.PI*5.4),returnHome=smoother((p-.70)/.30);return clampXYZ(hx+direction*8.5*osc*env,hy-SELECT_LIFT*(1-returnHome)+1.2*Math.sin(p*Math.PI*2)*env,direction*.075*osc*env,out);}
 export function invalidFeedbackPose(index:number,progress:number,direction:number,out:Pose=poseOut()):Pose{
   const hx=80+(index%3)*120,hy=130+Math.floor(index/3)*242,p=clamp01(progress);
   const deflection=p<.24?5*smoother(p/.24):p<.56?5-6.5*smoother((p-.24)/.32):-1.5*(1-smoother((p-.56)/.44));

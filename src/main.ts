@@ -22,7 +22,7 @@ let ready=false;
 const host=document.querySelector<HTMLElement>('#pixi-host')!;
 const board=document.querySelector<HTMLElement>('.board')!;
 const query=new URLSearchParams(location.search);
-const reference=import.meta.env.DEV&&(query.has('embedded')||query.get('fixture')==='reference');
+const reference=import.meta.env.DEV&&query.get('fixture')==='reference';
 const initial=reference?INITIAL:ORDINARY_COMMISSION;
 document.querySelector('.atelier')!.classList.toggle('reference',reference);
 const renderer=new StageRenderer(initial.length);
@@ -38,7 +38,7 @@ const hits=document.querySelector<HTMLElement>('.hit-glasses')!;
 const glassButtons=initial.map((_,i)=>{
   const b=document.createElement('button');b.type='button';b.dataset.glass=String(i);
   const p=position(i);b.style.left=`${(p.x/W-.105)*100}%`;b.style.top=`${(p.y+SCENE_TOP_PADDING-8)/H*100}%`;
-  b.innerHTML=`<span class="vessel-number" aria-hidden="true">${i+1}</span>`;hits.append(b);b.addEventListener('click',()=>choose(i));return b;
+  hits.append(b);b.addEventListener('click',()=>choose(i));return b;
 });
 function updateControls(){
   glassButtons.forEach((b,i)=>{const layers=model.board[i];b.setAttribute('aria-label',`Vessel ${i+1}, ${layers.length?`top to bottom: ${[...layers].reverse().map(c=>COLOR_NAMES[c]).join(', ')}`:'empty'}`);b.setAttribute('aria-pressed',String(model.selected===i));b.disabled=!model.isVesselAvailable(i);});

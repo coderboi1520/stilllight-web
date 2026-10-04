@@ -6,10 +6,10 @@ import { makeResult } from './result-utils.mjs';
 const digest = buffer => createHash('sha256').update(buffer).digest('hex');
 
 export async function run(harness) {
-  const started = performance.now(), name = 'PARITY_FREEZE';
+  const started = performance.now(), name = 'FRAME_FREEZE';
   let item; const artifacts = [];
   try {
-    const dir = await harness.artifactDir('parity-freeze');
+    const dir = await harness.artifactDir('frame-freeze');
     item = await harness.newIsolatedPage();
     const { page, errors } = item;
     await harness.goto(page);
