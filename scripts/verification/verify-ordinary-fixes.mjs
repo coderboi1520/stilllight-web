@@ -13,7 +13,7 @@ await withVerificationHarness({},async h=>{
   console.log(`${backend} focus: ${JSON.stringify(focus)}`);
   await page.screenshot({path:`${dir}/${backend}-keyboard-focus.png`});
   assert.ok(focus.focused);assert.equal(focus.outline,'none','no oversized hit-area focus outline');
-  assert.equal(focus.visualChildren,0,'visual numbers belong behind glass artwork, outside the hit-control layer');
+  assert.equal(focus.visualChildren,0,'semantic controls contain no visible artwork or numerals');
   assert.equal((await page.evaluate(()=>window.__STILLLIGHT_PIXI__.state())).selected,0,'native Enter still selects the vessel');
   await page.locator('[data-glass="0"]').click();await page.keyboard.press('1');
   const afterClickKey=await page.locator('[data-glass="0"]').evaluate(b=>({outline:getComputedStyle(b).outlineStyle,visualChildren:b.childElementCount}));
@@ -21,7 +21,7 @@ await withVerificationHarness({},async h=>{
   const utility=page.getByRole('button',{name:'Hint',exact:true});await utility.focus();
   assert.equal(await utility.evaluate(b=>getComputedStyle(b).outlineStyle),'solid','utility keyboard focus remains');
   assert.equal(await page.locator('.legend').count(),0);
-  await page.getByRole('button',{name:'Restart',exact:true}).click();
+  await page.getByRole('button',{name:'Reset level',exact:true}).focus();await page.keyboard.press('Enter');await page.keyboard.press('Space');await page.waitForTimeout(500);
   const initial=(await page.evaluate(()=>window.__STILLLIGHT_PIXI__.state())).board;
   await page.evaluate(()=>{window.__feedback=[];});
   const b=i=>page.locator(`[data-glass="${i}"]`);
@@ -39,7 +39,7 @@ await withVerificationHarness({},async h=>{
   await undo();await page.waitForTimeout(600);await undo();await page.waitForTimeout(600);
   assert.deepEqual((await page.evaluate(()=>window.__STILLLIGHT_PIXI__.state())).board,initial);
   await b(0).click();await b(1).click();await b(2).click();await b(5).click();
-  await page.getByRole('button',{name:'Restart',exact:true}).click();
+  await page.getByRole('button',{name:'Reset level',exact:true}).focus();await page.keyboard.press('Enter');await page.keyboard.press('Space');
   assert.equal((await page.evaluate(()=>window.__STILLLIGHT_PIXI__.state())).busy,false);
   // Same explicit clock, two mouth-connected streams in each actual backend.
   const feedbackBefore=await page.evaluate(()=>window.__feedback.length);

@@ -1,3 +1,4 @@
+import type {gameplayLayout} from './gameplayLayout.ts';
 import { COLORS,COMPLETION_ACCENTS,GLASS_BOTTOM,H,SCENE_TOP_PADDING,W } from '../core/constants.ts';
 import type {GlassFrame,LiquidLayerFrame,RenderFrame,StreamFrame} from '../core/RenderFrame.ts';
 import {CAP_ART_SCALE,CAP_ART_WIDTH,CAP_SOURCE_BOTTOM} from './capArtwork.ts';
@@ -18,6 +19,7 @@ export class CanvasRenderer{
   private canvas=document.createElement('canvas');
   private ctx=this.canvas.getContext('2d')!;
   private glassArtwork=makeGlassArtwork();
+  get vesselNumbersVisible(){return !this.layout&&this.numbers.length>0;}
   private numbers:HTMLCanvasElement[]=[];
   private width=W;
   private height=H;
@@ -29,6 +31,8 @@ export class CanvasRenderer{
   private restoration=0;
   private restorationAlpha=1;
   private presentation:Presentation='game';
+  private layout:ReturnType<typeof gameplayLayout>|null=null;
+  setGameplayLayout(layout:ReturnType<typeof gameplayLayout>){this.layout=layout;}
   private capTint='#ffffff';
   private glassTint='#ffffff';
   setFinishes(cap:string,glass:string){this.capTint=cap;this.glassTint=glass;}
@@ -50,7 +54,7 @@ export class CanvasRenderer{
   }
 
   private glass(frame:GlassFrame){
-    const ctx=this.ctx;ctx.save();ctx.translate(frame.pose.x,frame.pose.y+frame.completion.recoilY);ctx.rotate(frame.pose.angle);
+    const ctx=this.ctx;ctx.save();ctx.translate(frame.pose.x,frame.pose.y+frame.completion.recoilY);ctx.rotate(frame.pose.angle);ctx.scale(frame.localScale??1,frame.localScale??1);
     ctx.drawImage(this.glassArtwork.shadow,-90,-36,180,230);
     ctx.fillStyle='rgba(16,39,49,.18)';drawInteriorGlassPath(ctx);ctx.fill();
     ctx.save();drawInteriorGlassPath(ctx);ctx.clip();
@@ -61,9 +65,9 @@ export class CanvasRenderer{
     ctx.drawImage(tintedArtwork(this.glassArtwork.reflection,this.glassTint),-34+Math.max(-2,Math.min(2,-Math.sin(frame.pose.angle)*2)),0,68,158);
     ctx.drawImage(tintedArtwork(this.glassArtwork.edge,this.glassTint),-34,0,68,158);
     ctx.restore();
-    const glow=frame.invalid?'#ff8e94':frame.hintRole==='source'?'#f5d38e':frame.hintRole==='target'?'#83e0d4':frame.selected?'#f5d38e':null;
+    const glow=frame.invalid?'#ff8e94':frame.hintRole==='source'?'#f2b24b':frame.hintRole==='target'?'#bfd8e6':frame.selected?'#bfd8e6':null;
     if(glow){ctx.save();ctx.globalAlpha=frame.invalid?.55*frame.invalidStrength:frame.hintRole?frame.hintStrength:1;ctx.shadowColor=glow;ctx.shadowBlur=frame.invalid?12:16;outline(ctx,glow,frame.invalid?3:2.4,glow,frame.invalid?3:2.4);ctx.restore();}
-    if(frame.invalid){ctx.save();ctx.globalAlpha=.65*frame.invalidStrength;outline(ctx,'#ff8e94',3,'#ffb0b5',1.4);ctx.restore();}else if(frame.selected)outline(ctx,'#f5d38e',1.6,'#f9e1ae',1.8);else{ctx.strokeStyle='#b9d8e66f';ctx.lineWidth=1.25;openGlassPath(ctx);ctx.stroke();ctx.drawImage(this.glassArtwork.rim,-90,-36,180,230);}
+    if(frame.invalid){ctx.save();ctx.globalAlpha=.65*frame.invalidStrength;outline(ctx,'#ff8e94',3,'#ffb0b5',1.4);ctx.restore();}else if(frame.selected)outline(ctx,'#bfd8e6',1.6,'#e9eef2',1.8);else{ctx.strokeStyle='#b9d8e66f';ctx.lineWidth=1.25;openGlassPath(ctx);ctx.stroke();ctx.drawImage(this.glassArtwork.rim,-90,-36,180,230);}
     if(frame.cap.visible&&this.capImage){ctx.save();ctx.translate(0,frame.cap.y);ctx.rotate(frame.cap.rotation);ctx.scale(frame.cap.scaleX,frame.cap.scaleY);ctx.globalAlpha=frame.cap.alpha;
       ctx.drawImage(tintedArtwork(this.capImage,this.capTint,this.capTint!=='#ffffff'),-CAP_ART_WIDTH/2,-CAP_SOURCE_BOTTOM*CAP_ART_SCALE,CAP_ART_WIDTH,CAP_ART_WIDTH);
       ctx.restore();}
@@ -81,14 +85,14 @@ export class CanvasRenderer{
 
   render(frame:RenderFrame){
     const ctx=this.ctx,sx=this.width/W,sy=this.height/H;ctx.setTransform(this.density,0,0,this.density,0,0);ctx.clearRect(0,0,this.width,this.height);ctx.fillStyle='#071219';ctx.fillRect(0,0,this.width,this.height);
-    if(this.backdrop&&this.backdropImage){const b=this.backdrop;ctx.drawImage(this.backdropImage,b.x,b.y,b.width,b.height);ctx.fillStyle='rgba(0,0,0,.333333)';ctx.fillRect(0,0,this.width,this.height);ctx.drawImage(restorationArtwork(Math.max(0,this.restoration-1)),b.x,b.y,b.width,b.height);ctx.globalAlpha=this.restorationAlpha;ctx.drawImage(restorationArtwork(this.restoration,true),b.x,b.y,b.width,b.height);ctx.globalAlpha=1;}
+    if(this.backdrop&&this.backdropImage){const b=this.backdrop;ctx.drawImage(this.backdropImage,b.x,b.y,b.width,b.height);if(!this.layout){ctx.fillStyle='rgba(0,0,0,.333333)';ctx.fillRect(0,0,this.width,this.height);}ctx.drawImage(restorationArtwork(Math.max(0,this.restoration-1)),b.x,b.y,b.width,b.height);ctx.globalAlpha=this.restorationAlpha;ctx.drawImage(restorationArtwork(this.restoration,true),b.x,b.y,b.width,b.height);ctx.globalAlpha=1;}
     if(this.presentation==='workbench'){
       ctx.setTransform(this.density*sx,0,0,this.density*sx,0,0);
       for(const p of workbenchProps(frame)){const glass=frame.glasses[p.index];ctx.save();ctx.translate(p.x,p.y);ctx.scale(p.scale,p.scale);ctx.translate(-glass.pose.x,-glass.pose.y);this.glass(glass);ctx.restore();}return;
     }
-    if(frame.glasses.length>2&&this.numbers.length!==frame.glasses.length)this.numbers=makeVesselNumbers(frame.glasses.length);
-    for(let i=0;i<this.numbers.length;i++){const p=vesselNumberLayout(i,this.width,this.height);ctx.drawImage(this.numbers[i],p.x,p.y,NUMBER_WIDTH,NUMBER_HEIGHT);}
-    ctx.setTransform(this.density*sx,0,0,this.density*sy,0,0);ctx.translate(0,SCENE_TOP_PADDING);
+    if(!this.layout&&frame.glasses.length>2&&this.numbers.length!==frame.glasses.length)this.numbers=makeVesselNumbers(frame.glasses.length);
+    for(let i=0;!this.layout&&i<this.numbers.length;i++){const p=vesselNumberLayout(i,this.width,this.height);ctx.drawImage(this.numbers[i],p.x,p.y,NUMBER_WIDTH,NUMBER_HEIGHT);}
+    ctx.setTransform(this.density*(this.layout?.scale??sx),0,0,this.density*(this.layout?.scale??sy),0,0);if(!this.layout)ctx.translate(0,SCENE_TOP_PADDING);
     for(const glass of frame.glasses)if(!glass.moving)this.glass(glass);
     for(const glass of frame.glasses)if(glass.moving)this.glass(glass);
     for(const stream of frame.streams)this.stream(stream);

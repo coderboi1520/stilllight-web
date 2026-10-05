@@ -14,6 +14,7 @@ export async function run(harness) {
     const { page, errors } = item;
     await harness.gotoGame(page);
     await page.waitForSelector('#pixi-host canvas');
+    await page.evaluate(()=>document.fonts.ready);
 
     async function check(label, action, presentedAt, expectPresented, expectNext) {
       const first = await page.evaluate(({ action, presentedAt }) => {
@@ -27,9 +28,11 @@ export async function run(harness) {
       const canvas = page.locator('#pixi-host canvas');
       const original = await page.evaluate(() => { const c = document.querySelector('#pixi-host canvas'); return [c.width, c.height]; });
       // Read back the native canvas before each composed capture. This flushes
-      // Chromium's GPU readback consistently and also verifies the renderer's
+      // WebGL may discard its drawing buffer after composition. Redraw only
+      // the cached frame in the same task as readback (never sample/advance).
+      // This flushes Chromium's GPU readback consistently and also verifies the renderer's
       // own pixels independently of fractional CSS screenshot compositing.
-      const nativeBefore = await canvas.evaluate(c => c.toDataURL());
+      const nativeBefore = await canvas.evaluate(c => {window.__STILLLIGHT_PIXI__.redraw();return c.toDataURL();});
       const before = await canvas.screenshot();
       const painted = await page.evaluate(async png => { const image = new Image(); image.src = png; await image.decode(); const copy = document.createElement('canvas'); copy.width = image.width; copy.height = image.height; const context = copy.getContext('2d'); context.drawImage(image, 0, 0); const pixels = context.getImageData(0, 0, copy.width, copy.height).data; let count = 0; for (let i = 0; i < pixels.length; i += 4) if (pixels[i] > 45 || pixels[i + 1] > 55 || pixels[i + 2] > 65) count++; return count; }, `data:image/png;base64,${before.toString('base64')}`);
       if (painted === 0) throw new Error(`${label}: blank presented scene`);
@@ -37,12 +40,16 @@ export async function run(harness) {
       await page.waitForFunction(([w, h]) => { const c = document.querySelector('#pixi-host canvas'); return c.width !== w || c.height !== h; }, original);
       await page.setViewportSize({ width: 400, height: 620 });
       await page.waitForFunction(([w, h]) => { const c = document.querySelector('#pixi-host canvas'); return c.width === w && c.height === h; }, original);
+      // Backing dimensions update before ResizeObserver and CSS composition
+      // finish. Let that resize transaction complete; the manual clock stays
+      // frozen throughout and all exact data/native/composed checks remain.
+      await page.waitForTimeout(100);
       const second = await page.evaluate(() => { const app = window.__STILLLIGHT_PIXI__; return { state: app.state(), frame: app.lastFrame() }; });
-      const nativeAfter = await canvas.evaluate(c => c.toDataURL());
+      const nativeAfter = await canvas.evaluate(c => {window.__STILLLIGHT_PIXI__.redraw();return c.toDataURL();});
       const after = await canvas.screenshot();
       if (JSON.stringify(first) !== JSON.stringify(second) || nativeBefore !== nativeAfter || digest(before) !== digest(after)) {
         await page.screenshot({path:`${dir}/${label}-after-failure.png`});
-        const fs=await import('node:fs/promises');await fs.writeFile(`${dir}/${label}-before-canvas.png`,before);await fs.writeFile(`${dir}/${label}-after-canvas.png`,after);
+        const fs=await import('node:fs/promises');await fs.writeFile(`${dir}/${label}-before-canvas.png`,before);await fs.writeFile(`${dir}/${label}-after-canvas.png`,after);await fs.writeFile(`${dir}/${label}-native-before.png`,Buffer.from(nativeBefore.split(',')[1],'base64'));await fs.writeFile(`${dir}/${label}-native-after.png`,Buffer.from(nativeAfter.split(',')[1],'base64'));
         throw new Error(`${label}: presented frame changed on resize invalidation; data=${JSON.stringify(first) === JSON.stringify(second) ? 'stable' : 'changed'}, native=${nativeBefore === nativeAfter ? 'stable' : 'changed'}, image=${digest(before) === digest(after) ? 'stable' : 'changed'}`);
       }
       const next = await page.evaluate(now => { const app = window.__STILLLIGHT_PIXI__; app.step(now); return { state: app.state(), frame: app.lastFrame() }; }, presentedAt + 1);
@@ -55,10 +62,11 @@ export async function run(harness) {
     const mid = await check('mid-pour', 'pour', 1450,
       x => x.state.busy && x.frame.glasses.some(g => g.moving),
       x => x.state.busy && x.frame.glasses.some(g => g.moving));
-    const hintBefore = await check('hint-before-expiry', 'hint', 1679,
+    const hintExpiry=1000+await page.evaluate(()=>window.__STILLLIGHT_PIXI__.presentation().hintMs);
+    const hintBefore = await check('hint-before-expiry', 'hint', hintExpiry-1,
       x => x.frame.glasses[0].hintRole === 'source' && x.frame.glasses[1].hintRole === 'target' && x.frame.glasses.filter(g=>g.hintRole).length===2 && x.frame.glasses.filter(g=>g.hintRole).every(g => g.hintStrength > 0 && g.hintStrength < 1),
       x => x.frame.glasses.every(g => g.hintRole === null && g.hintStrength === 0));
-    const hint = await check('hint-expiry', 'hint', 1680,
+    const hint = await check('hint-expiry', 'hint', hintExpiry,
       x => x.frame.glasses.every(g => g.hintRole === null && g.hintStrength === 0),
       x => x.frame.glasses.every(g => g.hintRole === null && g.hintStrength === 0));
     const pour = await check('pour-completion', 'pour', 2040,

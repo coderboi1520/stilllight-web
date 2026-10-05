@@ -1,3 +1,4 @@
+import type {gameplayLayout} from '../gameplayLayout.ts';
 import { Application,Assets,Container,Sprite,Texture } from 'pixi.js';
 import { H,SCENE_TOP_PADDING,W } from '../../core/constants.ts';
 import type {RenderFrame} from '../../core/RenderFrame.ts';
@@ -13,7 +14,9 @@ import {tintedArtwork} from '../tintedArtwork.ts';
 export class PixiRenderer{
   readonly backend='webgl' as const;
   app=new Application();
-  private scene=new Container();
+  // The scaled vessel scene owns its transform independently of the full-stage
+  // plate and restoration artwork, including cached redraws after resize.
+  private scene=new Container({isRenderGroup:true});
   // Keep label textures out of glass batches so frozen redraws stay byte-exact.
   private numbers=new Container({isRenderGroup:true});
   private numberTextures:Texture[]=[];
@@ -27,10 +30,12 @@ export class PixiRenderer{
   private glassTint='#ffffff';
   setFinishes(cap:string,glass:string){this.capTint=cap;this.glassTint=glass;this.glasses?.forEach(g=>g.setFinishes(cap,glass));}
   private presentation:Presentation='game';
+  private layout:ReturnType<typeof gameplayLayout>|null=null;
+  setGameplayLayout(layout:ReturnType<typeof gameplayLayout>){this.layout=layout;this.layoutScene();this.numbers.visible=false;this.numbers.removeChildren().forEach(c=>c.destroy());this.numberTextures.forEach(t=>t.destroy(true));this.numberTextures=[];}
   private width=W;
   private height=H;
   setPresentation(mode:Presentation){this.presentation=mode;this.layoutScene();}
-  private layoutScene(){this.scene.scale.set(this.width/W,this.presentation==='workbench'?this.width/W:this.height/H);this.scene.y=this.presentation==='workbench'?0:SCENE_TOP_PADDING*this.height/H;this.numbers.visible=this.presentation==='game';}
+  private layoutScene(){this.scene.scale.set(this.layout?.scale??this.width/W,this.layout?.scale??(this.presentation==='workbench'?this.width/W:this.height/H));this.scene.y=this.layout?0:this.presentation==='workbench'?0:SCENE_TOP_PADDING*this.height/H;this.numbers.visible=this.presentation==='game'&&!this.layout;}
   private capTexture:Texture|null=null;
   private neutralCapTexture:Texture|null=null;
   private backdrop:Sprite|null=null;
@@ -68,7 +73,7 @@ export class PixiRenderer{
     this.app.renderer.scheduler.destroy();
     this.capTexture=await Assets.load<Texture>('/assets/pumpkin-cap.png');
     const capSource=new Image();capSource.src='/assets/pumpkin-cap.png';await capSource.decode();this.neutralCapTexture=Texture.from(tintedArtwork(capSource,'#ffffff',true));
-    this.backdrop=new Sprite(await Assets.load<Texture>('/assets/moonlit-studio.png'));this.backdrop.tint='#aaaaaa';
+    this.backdrop=new Sprite(await Assets.load<Texture>('/assets/moonlit-studio.png'));this.backdrop.tint='#ffffff';
     host.appendChild(this.app.canvas);
     this.app.stage.addChild(this.backdrop,this.restoration,this.numbers,this.scene);
     this.numberTextures=makeVesselNumbers(this.vesselCount).map(canvas=>Texture.from(canvas));
@@ -116,6 +121,7 @@ export class PixiRenderer{
     for(const stream of this.streams)this.scene.setChildIndex(stream.root,order++);
   }
 
+  get vesselNumbersVisible(){return this.numbers.visible&&this.numbers.children.length>0;}
   private ensureVesselCount(count:number){
     // Grow a bounded retained view pool. Shrinking active boards must not retire
     // meshes while Pixi is still holding their onRender callbacks. The model,
@@ -125,7 +131,7 @@ export class PixiRenderer{
       while(this.streams.length<Math.floor(count/2)){const stream=new StreamView();this.streams.push(stream);this.scene.addChild(stream.root);}
       this.vesselCount=count;this.movingOrder='';
     }
-    if(this.numbers.children.length!==count){
+    if(!this.layout&&this.numbers.children.length!==count){
       this.numbers.removeChildren().forEach(c=>c.destroy());this.numberTextures.forEach(t=>t.destroy(true));
       this.numberTextures=makeVesselNumbers(this.vesselCount).map(c=>Texture.from(c));
       this.numberTextures.forEach((texture,i)=>{const s=new Sprite(texture),p=vesselNumberLayout(i,this.width,this.height);s.width=NUMBER_WIDTH;s.height=NUMBER_HEIGHT;s.position.set(p.x,p.y);this.numbers.addChild(s);});
@@ -134,7 +140,7 @@ export class PixiRenderer{
   render(frame:RenderFrame){
     if(!this.initialized||!this.glasses)return;
     this.ensureVesselCount(frame.glasses.length);
-    for(let i=0;i<this.glasses.length;i++){this.glasses[i].root.visible=this.presentation==='game'&&i<frame.glasses.length;this.glasses[i].root.scale.set(1);if(i<frame.glasses.length)this.glasses[i].update(frame.glasses[i]);}
+    for(let i=0;i<this.glasses.length;i++){this.glasses[i].root.visible=this.presentation==='game'&&i<frame.glasses.length;this.glasses[i].root.scale.set(frame.glasses[i]?.localScale??1);if(i<frame.glasses.length)this.glasses[i].update(frame.glasses[i]);}
     if(this.presentation==='workbench'){
       for(const p of workbenchProps(frame)){const root=this.glasses[p.index].root;root.visible=true;root.position.set(p.x,p.y);root.scale.set(p.scale);}
       for(const stream of this.streams)stream.root.visible=false;

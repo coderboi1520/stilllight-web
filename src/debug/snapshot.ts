@@ -8,7 +8,7 @@ export function snapshotFrame(frame:RenderFrame){
     now:frame.now,
     board:frame.board.map(glass=>[...glass]),
     glasses:frame.glasses.map(glass=>({
-      index:glass.index,pose:{...glass.pose},surfaceAngle:glass.surfaceAngle,
+      index:glass.index,localScale:glass.localScale??1,pose:{...glass.pose},surfaceAngle:glass.surfaceAngle,
       relativeLiquidRotation:glass.relativeLiquidRotation,wave:glass.wave,phase:glass.phase,
       dynamicLiquid:glass.dynamicLiquid,
       layers:glass.layers.map(layer=>({color:layer.color,amount:layer.amount,bottom:layer.bottom,top:layer.top,isTop:layer.isTop,wavy:layer.wavy,surface:layer.surface?Array.from(layer.surface):null})),

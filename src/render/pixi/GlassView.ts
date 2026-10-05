@@ -55,7 +55,7 @@ export class GlassView{
   private capBody=new Sprite();
   private particles:Graphics[]=[];
   private normal=new Graphics(openWallContext()).stroke({color:'#b9d8e66f',width:1.25});
-  private selected=outline('#f5d38e',1.6,'#f9e1ae',1.8);
+  private selected=outline('#bfd8e6',1.6,'#e9eef2',1.8);
   private invalid=outline('#ff8e94',3,'#ffb0b5',1.4);
   private glows:{selected:Sprite;hintSource:Sprite;hintTarget:Sprite;invalid:Sprite};
   private glowList:Sprite[]=[];
@@ -84,7 +84,7 @@ export class GlassView{
     this.normalRim.position.set(-90,-36);
     this.normalRim.width=180;
     this.normalRim.height=230;
-    const selectedTexture=makeGlowTexture('#f5d38e',2.4,16),hintSourceTexture=makeGlowTexture('#f5d38e',2.4,16),hintTargetTexture=makeGlowTexture('#83e0d4',2.4,16),invalidTexture=makeGlowTexture('#ff8e94',3,12);
+    const selectedTexture=makeGlowTexture('#bfd8e6',2.4,16),hintSourceTexture=makeGlowTexture('#f2b24b',2.4,16),hintTargetTexture=makeGlowTexture('#bfd8e6',2.4,16),invalidTexture=makeGlowTexture('#ff8e94',3,12);
     this.ownedTextures.push(selectedTexture,hintSourceTexture,hintTargetTexture,invalidTexture);
     this.glows={selected:new Sprite(selectedTexture),hintSource:new Sprite(hintSourceTexture),hintTarget:new Sprite(hintTargetTexture),invalid:new Sprite(invalidTexture)};
     this.glowList=[this.glows.selected,this.glows.hintSource,this.glows.hintTarget,this.glows.invalid];

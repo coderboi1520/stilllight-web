@@ -17,17 +17,17 @@ function interiorHalfWidth(y:number){
   return GLASS_HALF_WIDTH-2;
 }
 
-export function prepareSurfaceContact(glass:GlassFrame,direction:number,out:SurfaceContact,worldX?:number){
+export function prepareSurfaceContact(glass:GlassFrame,direction:number,out:SurfaceContact,worldX?:number,scale=1){
   const top=glass.layers.at(-1),angle=glass.pose.angle+glass.relativeLiquidRotation,c=Math.cos(angle),s=Math.sin(angle);
   let x=-direction*CONTACT_OFFSET;
   let y=GLASS_BOTTOM,tx=1,ty=0;
   out.empty=!top;
   if(top)y=top.top;
   if(worldX!==undefined){
-    x=(worldX-glass.pose.x+y*s)/c;
+    x=((worldX-glass.pose.x)/scale+y*s)/c;
     if(top?.wavy&&top.surface)for(let i=0;i<5;i++){
       y=heightAt(top.surface,x);
-      x=(worldX-glass.pose.x+y*s)/c;
+      x=((worldX-glass.pose.x)/scale+y*s)/c;
     }
     const limit=interiorHalfWidth(y);
     x=Math.max(-limit,Math.min(limit,x));
@@ -44,7 +44,7 @@ export function prepareSurfaceContact(glass:GlassFrame,direction:number,out:Surf
   }
   out.local.x=x;out.local.y=y;
   out.tangent.x=tx;out.tangent.y=ty;
-  out.world.x=glass.pose.x+x*c-y*s;
-  out.world.y=glass.pose.y+x*s+y*c;
+  out.world.x=glass.pose.x+scale*(x*c-y*s);
+  out.world.y=glass.pose.y+scale*(x*s+y*c);
   return out;
 }

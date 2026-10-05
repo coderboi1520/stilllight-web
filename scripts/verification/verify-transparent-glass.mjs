@@ -13,7 +13,8 @@ await withVerificationHarness({},async h=>{
    const c=document.querySelector('#pixi-host canvas'),image=new Image();image.src=c.toDataURL();await image.decode();
    const copy=document.createElement('canvas');copy.width=c.width;copy.height=c.height;const ctx=copy.getContext('2d');ctx.drawImage(image,0,0);
    // Vessel six is empty: compare the backdrop visible through its central interior.
-   return [40,70,100].map(y=>Array.from(ctx.getImageData(Math.round(320*c.width/400),Math.round((372+20+y)*c.height/620),1,1).data).slice(0,3));
+   const a=window.__STILLLIGHT_PIXI__,g=a.lastFrame().glasses[5],scale=c.width/a.presentation().geometry.width;
+   return [40,70,100].map(y=>Array.from(ctx.getImageData(Math.round(g.pose.x*scale),Math.round((g.pose.y+y*g.localScale)*scale),1,1).data).slice(0,3));
   });
   await page.screenshot({path:`${dir}/${backend}-transparent-idle.png`});
   console.log(`${backend} empty-glass pixels: ${JSON.stringify(colors)}`);

@@ -1,3 +1,4 @@
+import {sceneGeometry,type SceneProfile} from './sceneGeometry.ts';
 import { DEPARTURE_BLEND_MS,DESELECT_RETURN_MS,EPSILON,HINT_ATTENTION_MS,INITIAL,INVALID_MS,POUR_MS,UNDO_MS,SELECT_MS,SETTLE_MS,STREAM_END,STREAM_START,TRANSFER_END,TRANSFER_START,SURFACE_SAMPLES } from './constants.ts';
 import { clamp01,invalidFeedbackPose,movingPose,position,pourDirection,pouringLip,selectedPose,selectedPoseDerivative,smooth,smoother,streamControl,type Pose } from './geometry.ts';
 import { liquidLevel,liquidTop,sampleAreaPreservingSurface,sampleSurface } from './liquidMath.ts';
@@ -30,14 +31,14 @@ const RESPONSE_TAPER_START=.55;
 const RESPONSE_TAPER_Q=(RESPONSE_TAPER_START-TRANSFER_START)/(TRANSFER_END-TRANSFER_START);
 const RESPONSE_TAPER_VALUE=4*RESPONSE_TAPER_Q*(1-RESPONSE_TAPER_Q);
 const RESPONSE_TAPER_VELOCITY=4*(1-2*RESPONSE_TAPER_Q)/(TRANSFER_END-TRANSFER_START);
-function hintStrength(hint:Hint|null,index:number,now:number){
+function hintStrength(hint:Hint|null,index:number,now:number,duration=HINT_ATTENTION_MS,delay=HINT_TARGET_DELAY_MS){
   if(!hint||index!==hint.source&&index!==hint.target)return 0;
-  const elapsed=now-hint.started-(index===hint.target?HINT_TARGET_DELAY_MS:0);
-  return smooth(elapsed/HINT_FADE_IN_MS)*(1-smooth((now-hint.started-(HINT_ATTENTION_MS-HINT_FADE_OUT_MS))/HINT_FADE_OUT_MS));
+  const elapsed=now-hint.started-(index===hint.target?delay:0);
+  return smooth(elapsed/HINT_FADE_IN_MS)*(1-smooth((now-hint.started-(duration-HINT_FADE_OUT_MS))/HINT_FADE_OUT_MS));
 }
-function hintStrengthVelocity(hint:Hint|null,index:number,now:number){
+function hintStrengthVelocity(hint:Hint|null,index:number,now:number,duration=HINT_ATTENTION_MS,delay=HINT_TARGET_DELAY_MS){
   if(!hint||index!==hint.source&&index!==hint.target)return 0;
-  const elapsed=now-hint.started-(index===hint.target?HINT_TARGET_DELAY_MS:0),fade=now-hint.started-(HINT_ATTENTION_MS-HINT_FADE_OUT_MS);
+  const elapsed=now-hint.started-(index===hint.target?delay:0),fade=now-hint.started-(duration-HINT_FADE_OUT_MS);
   const a=clamp01(elapsed/HINT_FADE_IN_MS),b=clamp01(fade/HINT_FADE_OUT_MS);
   const da=elapsed>0&&elapsed<HINT_FADE_IN_MS?6*a*(1-a)/HINT_FADE_IN_MS:0;
   const db=fade>0&&fade<HINT_FADE_OUT_MS?6*b*(1-b)/HINT_FADE_OUT_MS:0;
@@ -49,8 +50,8 @@ function receiverResponseAt(p:number){
   if(p<=RESPONSE_TAPER_START){const q=(p-TRANSFER_START)/(TRANSFER_END-TRANSFER_START);return 4*q*(1-q);}
   return Math.max(0,correctionValue(RESPONSE_TAPER_VALUE,RESPONSE_TAPER_VELOCITY,p-RESPONSE_TAPER_START,1-RESPONSE_TAPER_START));
 }
-function flightSurface(active:Flight,index:number,now:number,out:SurfaceState){
-  const p=clamp01((now-active.started)/POUR_MS),direction=pourDirection(active.source,active.target);
+function flightSurface(active:Flight,index:number,now:number,out:SurfaceState,direction=pourDirection(active.source,active.target)){
+  const p=clamp01((now-active.started)/POUR_MS);
   out.angle=0;out.wave=0;out.phase=now*.018;
   if(index===active.source){
     const departure=Math.sin(Math.PI*smoother(p/.58));
@@ -87,6 +88,24 @@ const makeStreamFrame=():StreamFrame=>({id:0,source:0,target:0,visible:true,colo
 const makeEventKinematics=():EventKinematics=>({pose:{x:0,y:0,angle:0},velocity:{x:0,y:0,angle:0}});
 
 export class StilllightModel{
+  geometry=sceneGeometry();
+  setPresentationGeometry(profile:SceneProfile){this.geometry=sceneGeometry(profile);}
+  private get selectionMs(){return this.geometry.selectMs;}
+  private get hintMs(){return this.geometry.profile?(this.reducedMotion?1400:1600):HINT_ATTENTION_MS;}
+  private resetDipAt:number|null=null;
+  private undoShimmer:Hint|null=null;
+  showResetDip(now:number){this.resetDipAt=this.geometry.profile&&!this.reducedMotion?now:null;}
+  private attention(index:number,now:number){
+    if(!this.geometry.profile)return hintStrength(this.hintMotion,index,now);
+    const h=this.hintMotion;if(!h||index!==h.source&&index!==h.target)return 0;const t=now-h.started;
+    if(this.reducedMotion)return t>=0&&t<1400?.35*(1-smooth((t-1200)/200)):0;
+    const elapsed=t-(index===h.target?380:0);if(elapsed<0||t>=1600)return 0;
+    const pulse=elapsed<200?smooth(elapsed/200):elapsed<700?1-.65*smooth((elapsed-200)/500):.35;return pulse*(1-smooth((t-1400)/200));
+  }
+  private dip(index:number,now:number,derivative=false){
+    if(this.resetDipAt===null||this.reducedMotion)return 0;const t=now-this.resetDipAt-index*30;if(t<0||t>=260)return 0;const a=6/(this.geometry.profile?.pixelScale??1);return derivative?a*Math.PI/260*Math.cos(Math.PI*t/260):a*Math.sin(Math.PI*t/260);
+  }
+  private cancelResetDip(now:number){if(this.resetDipAt===null)return;this.capturePair(now);this.resetDipAt=null;for(let i=0;i<this.board.length;i++){zeroPose(this.targetVelocity);this.beginCorrection(i,now,140,this.targetVelocity);}}
   board=clone(INITIAL);
   private boardFrame=clone(INITIAL);
   selected:number|null=null;
@@ -153,7 +172,7 @@ export class StilllightModel{
 
   showHint(source:number,target:number,now:number){
     if(this.busy||this.settleMotion||!pour(this.board,source,target))return false;
-    this.capturePair(now);const selected=this.selected;
+    this.cancelResetDip(now);this.capturePair(now);const selected=this.selected;
     this.selected=null;this.selectionPulse=null;this.hintMotion={source,target,started:now};
     if(selected!==null){this.velocityAt(selected,now,this.targetVelocity,false);this.beginCorrection(selected,now,DESELECT_RETURN_MS,this.targetVelocity);}
     this.record('hint-start');return true;
@@ -175,7 +194,7 @@ export class StilllightModel{
   canUndo(now:number){
     const entry=this.moveHistory.at(-1);if(this.busy||this.settleMotion||!entry||!this.historyMatches(entry))return false;
     for(let i=0;i<this.board.length;i++){
-      const home=position(i),pose=this.poseAt(i,now,this.targetPose),v=this.velocityAt(i,now,this.targetVelocity);
+      const home=this.geometry.position(i),pose=this.poseAt(i,now,this.targetPose),v=this.velocityAt(i,now,this.targetVelocity);
       if(Math.abs(pose.x-home.x)+Math.abs(pose.y-home.y)+Math.abs(pose.angle)+Math.abs(v.x)+Math.abs(v.y)+Math.abs(v.angle)>1e-7)return false;
     }
     return true;
@@ -235,15 +254,16 @@ export class StilllightModel{
   }
 
   private poseAt(index:number,now:number,out:Pose,includeCorrection=true){
-    if(this.reducedMotion){position(index,out);out.angle=0;return out;}
+    if(this.reducedMotion){if(this.geometry.profile&&this.selected===index)this.geometry.selectedPose(index,1,out);else this.geometry.position(index,out);out.angle=0;return out;}
     const active=this.flightFor(index),invalid=this.invalidMotion,pulse=this.selectionPulse,hint=this.hintMotion;
-    const progress=active?clamp01((now-active.started)/POUR_MS):0,transfer=active?transferAt(progress):0,invalidProgress=invalid?clamp01((now-invalid.started)/INVALID_MS):0,pulseProgress=pulse?clamp01((now-pulse.started)/SELECT_MS):0;
+    const progress=active?clamp01((now-active.started)/POUR_MS):0,transfer=active?transferAt(progress):0,invalidProgress=invalid?clamp01((now-invalid.started)/INVALID_MS):0,pulseProgress=pulse?clamp01((now-pulse.started)/this.selectionMs):0;
     const moving=active?.kind==='pour'&&active.source===index;
-    position(index,out);out.angle=0;
-    if(moving&&active){const remainingUnits=active.before[active.source].length-active.amount*transfer;movingPose(active.source,active.target,progress,remainingUnits,out);}
-    else if(invalid&&index===invalid.source)invalidFeedbackPose(index,invalidProgress,invalid.direction,out);
-    else if(this.selected===index)selectedPose(index,pulse?.index===index?pulseProgress:1,out);
-    if(!moving&&!invalid&&hint)out.y-=(hint.source===index?1.8:hint.target===index?1.2:0)*hintStrength(hint,index,now);
+    this.geometry.position(index,out);out.angle=0;
+    if(moving&&active){const remainingUnits=active.before[active.source].length-active.amount*transfer;this.geometry.movingPose(active.source,active.target,progress,remainingUnits,out);}
+    else if(invalid&&index===invalid.source)this.geometry.invalidFeedbackPose(index,invalidProgress,invalid.direction,out);
+    else if(this.selected===index)this.geometry.selectedPose(index,pulse?.index===index?pulseProgress:1,out);
+    if(!moving&&!invalid&&hint)out.y-=(hint.source===index?1.8:hint.target===index?1.2:0)*this.attention(index,now);
+    out.y+=this.dip(index,now);
     if(includeCorrection)this.applyCorrection(index,now,out);
     return out;
   }
@@ -252,8 +272,9 @@ export class StilllightModel{
     zeroPose(out);
     if(this.reducedMotion)return out;
     const active=this.flightFor(index),invalid=this.invalidMotion?.source===index?this.invalidMotion:null,pulse=this.selectionPulse,hint=this.hintMotion,moving=active?.kind==='pour'&&active.source===index;
-    if(!active&&!invalid&&this.selected===index&&pulse?.index===index){const raw=(now-pulse.started)/SELECT_MS;if(raw>=0&&raw<1){selectedPoseDerivative(raw,out);out.y/=SELECT_MS;}}
-    if(!moving&&!invalid&&hint)out.y-=(hint.source===index?1.8:hint.target===index?1.2:0)*hintStrengthVelocity(hint,index,now);
+    if(!active&&!invalid&&this.selected===index&&pulse?.index===index){const raw=(now-pulse.started)/this.selectionMs;if(raw>=0&&raw<1){this.geometry.selectedPoseDerivative(raw,out,index);out.y/=this.selectionMs;}}
+    if(!moving&&!invalid&&hint)out.y-=(hint.source===index?1.8:hint.target===index?1.2:0)*(this.geometry.profile?(this.attention(index,now+.05)-this.attention(index,now-.05))/.1:hintStrengthVelocity(hint,index,now));
+    out.y+=this.dip(index,now,true);
     if(includeCorrection)this.applyCorrectionVelocity(index,now,out);
     return out;
   }
@@ -262,10 +283,10 @@ export class StilllightModel{
     if(this.reducedMotion){out.angle=0;out.wave=0;out.phase=now*.018;return out;}
     const active=this.flightFor(index),invalid=this.invalidMotion,pulse=this.selectionPulse,settle=this.settleFor(index);
     out.angle=0;out.wave=0;out.phase=now*.018;
-    if(active?.kind==='pour')flightSurface(active,index,now,out);
+    if(active?.kind==='pour')flightSurface(active,index,now,out,this.geometry.pourDirection(active.source,active.target));
     else if(active?.kind==='undo')undoSurface(active,index,now,out);
     else if(invalid&&index===invalid.source){const p=clamp01((now-invalid.started)/INVALID_MS),envelope=Math.sin(Math.PI*p);out.angle=-invalid.direction*.026*envelope*envelope;out.wave=1.15*envelope*envelope;}
-    else if(this.selected===index&&pulse?.index===index){const p=clamp01((now-pulse.started)/SELECT_MS);if(p<1){out.angle=.018*damped(p*Math.PI*4.5,p*2.4);out.wave=1.65*Math.sin(Math.PI*p)*Math.exp(-p*.8);}}
+    else if(this.selected===index&&pulse?.index===index){const p=clamp01((now-pulse.started)/this.selectionMs);if(p<1){out.angle=.018*damped(p*Math.PI*4.5,p*2.4);out.wave=1.65*Math.sin(Math.PI*p)*Math.exp(-p*.8);}}
     else if(settle&&(index===settle.source||index===settle.target)){
       const p=clamp01((now-settle.started)/SETTLE_MS),inherited=settle.surfaces[index];
       const envelope=1-smoother(p);out.angle=inherited.angle*envelope;out.wave=inherited.wave*envelope;out.phase=inherited.phase+(now-settle.started)*.018;
@@ -313,7 +334,7 @@ export class StilllightModel{
     this.poseCorrections[index]={started:now,duration,dx,dy,da,dvx,dvy,dva};
   }
 
-  reset(){this.board=clone(this.initial);this.boardFrame=clone(this.board);this.selected=null;this.activeFlights.length=0;this.settlingPairs.length=0;this.invalidMotion=this.selectionPulse=this.hintMotion=null;this.invalidSource=this.invalidTarget=null;this.poseCorrections.fill(null);this.surfaceCorrections.fill(null);this.capComplete=this.board.map(isBottleComplete);this.capMotions.fill(null);this.completionMotions.fill(null);this.moveHistory.length=0;this.acceptedHistory.length=0;this.events=['reset'];}
+  reset(){this.board=clone(this.initial);this.boardFrame=clone(this.board);this.selected=null;this.activeFlights.length=0;this.settlingPairs.length=0;this.invalidMotion=this.selectionPulse=this.hintMotion=null;this.invalidSource=this.invalidTarget=null;this.poseCorrections.fill(null);this.surfaceCorrections.fill(null);this.capComplete=this.board.map(isBottleComplete);this.capMotions.fill(null);this.completionMotions.fill(null);this.moveHistory.length=0;this.acceptedHistory.length=0;this.events=['reset'];this.resetDipAt=null;this.undoShimmer=null;}
 
   previewCompletedRight(now:number){
     this.reset();
@@ -324,13 +345,13 @@ export class StilllightModel{
 
   choose(index:number,now:number){
     if(!this.isVesselAvailable(index))return;
-    const source=this.selected;
+    this.cancelResetDip(now);const source=this.selected;
     if(source===null){
       if(this.board[index].length){
         const hint=this.hintMotion;
         this.capturePair(now);
         this.selected=index;this.selectionPulse={index,started:now};this.hintMotion=null;
-        this.velocityAt(index,now,this.targetVelocity,false);this.beginCorrection(index,now,SELECT_MS,this.targetVelocity);
+        this.velocityAt(index,now,this.targetVelocity,false);this.beginCorrection(index,now,this.selectionMs,this.targetVelocity);
         this.continueClearedOthers([index],now,hint,null);
         this.record(`selected:${index}`);
       }
@@ -340,7 +361,7 @@ export class StilllightModel{
     const result=pour(this.board,source,index);
     if(!result){
       if(this.invalidMotion)return;
-      const direction=position(index).x>=position(source).x?1:-1,hint=this.hintMotion;
+      const direction=this.geometry.position(index).x>=this.geometry.position(source).x?1:-1,hint=this.hintMotion;
       this.capturePair(now);
       this.selected=null;this.selectionPulse=null;this.hintMotion=null;
       this.invalidSource=source;this.invalidTarget=index;this.invalidMotion={source,target:index,direction,started:now};
@@ -366,7 +387,7 @@ export class StilllightModel{
     if(!entry||!this.historyMatches(entry))return false;
     this.capturePair(now);
     for(let index=0;index<this.board.length;index++){
-      const home=position(index),{pose,velocity}=this.eventKinematics[index];
+      const home=this.geometry.position(index),{pose,velocity}=this.eventKinematics[index];
       if(Math.abs(pose.x-home.x)+Math.abs(pose.y-home.y)+Math.abs(pose.angle)+
         Math.abs(velocity.x)+Math.abs(velocity.y)+Math.abs(velocity.angle)>1e-7)return false;
     }
@@ -375,6 +396,7 @@ export class StilllightModel{
     restored[entry.source]=[...entry.beforeSource];restored[entry.target]=[...entry.beforeTarget];
     this.moveHistory.pop();
     this.acceptedHistory.pop();
+    this.undoShimmer=this.geometry.profile?{source:entry.source,target:entry.target,started:now}:null;
     this.selected=null;this.selectionPulse=null;this.hintMotion=null;
     this.invalidSource=this.invalidTarget=null;
     this.acceptFlight(entry.target,entry.source,before,entry.amount,entry.color,now,'undo');
@@ -386,7 +408,7 @@ export class StilllightModel{
   }
 
   hint(now:number){
-    if(this.busy||this.settleMotion||this.hintMotion&&now-this.hintMotion.started<HINT_ATTENTION_MS)return;
+    if(this.busy||this.settleMotion||this.hintMotion&&now-this.hintMotion.started<this.hintMs)return;
     let pair:Hint|null=null,best=-Infinity;
     for(let source=0;source<this.board.length;source++)for(let target=0;target<this.board.length;target++){
       if(isBottleComplete(this.board[source]))continue;
@@ -422,13 +444,13 @@ export class StilllightModel{
 
   sample(now:number):RenderFrame{
     const active=this.flight,invalid=this.invalidMotion,settling=this.settleMotion,hint=this.hintMotion;
-    const progress=active?clamp01((now-active.started)/(active.kind==='undo'?UNDO_MS:POUR_MS)):0,transfer=active?(active.kind==='undo'?undoTransferAt(progress):transferAt(progress)):0,invalidProgress=invalid?clamp01((now-invalid.started)/INVALID_MS):0,settleProgress=settling?clamp01((now-settling.started)/SETTLE_MS):0,activeDirection=active?pourDirection(active.source,active.target):1;
+    const progress=active?clamp01((now-active.started)/(active.kind==='undo'?UNDO_MS:POUR_MS)):0,transfer=active?(active.kind==='undo'?undoTransferAt(progress):transferAt(progress)):0,invalidProgress=invalid?clamp01((now-invalid.started)/INVALID_MS):0,settleProgress=settling?clamp01((now-settling.started)/SETTLE_MS):0,activeDirection=active?this.geometry.pourDirection(active.source,active.target):1;
 
     const makeGlass=(index:number,moving=false)=>{
       const active=this.flightFor(index);
       const progress=active?clamp01((now-active.started)/(active.kind==='undo'?UNDO_MS:POUR_MS)):0;
       const transfer=active?(active.kind==='undo'?undoTransferAt(progress):transferAt(progress)):0;
-      const frame=this.glassFrames[index];
+      const frame=this.glassFrames[index];frame.localScale=this.geometry.localScale(index);
       this.poseAt(index,now,frame.pose,true);
       const surface=this.surfaceAt(index,now,this.surfaceStates[index]);
       const surfaceAngle=surface.angle,wave=surface.wave,phase=surface.phase;
@@ -455,8 +477,9 @@ export class StilllightModel{
       frame.layers.length=visibleCount;
       for(let i=0;i<visibleCount;i++)frame.layers[i]=slots[i];
       frame.surfaceAngle=surfaceAngle;frame.relativeLiquidRotation=-frame.pose.angle+surfaceAngle;frame.wave=wave;frame.phase=phase;frame.dynamicLiquid=movingLiquid;frame.selected=this.selected===index;
-      frame.hintStrength=moving?0:hintStrength(hint,index,now);
+      frame.hintStrength=moving?0:this.attention(index,now);
       frame.hintRole=frame.hintStrength>0?hint?.source===index?'source':hint?.target===index?'target':null:null;
+      const shimmer=this.undoShimmer;if(shimmer&&(index===shimmer.source||index===shimmer.target)){const t=now-shimmer.started;if(t>=0&&t<400){frame.hintRole='target';frame.hintStrength=.55*Math.sin(Math.PI*t/400);}}
       frame.invalid=this.invalidSource===index||this.invalidTarget===index;
       frame.invalidStrength=frame.invalid?invalidStrength(invalidProgress):0;frame.moving=moving;
       sampleCap(this.capComplete[index],this.capMotions[index],now,frame.cap);
@@ -469,20 +492,20 @@ export class StilllightModel{
     };
 
     const glasses=this.glassFrames;
-    for(let i=0;i<this.board.length;i++){const owned=this.flightFor(i);makeGlass(i,owned?.kind==='pour'&&owned.source===i);prepareSurfaceContact(glasses[i],i%3===0?-1:1,glasses[i].contact);}
+    for(let i=0;i<this.board.length;i++){const owned=this.flightFor(i);makeGlass(i,owned?.kind==='pour'&&owned.source===i);prepareSurfaceContact(glasses[i],this.geometry.profile?(this.geometry.position(i).x<this.geometry.profile.width/2?-1:1):i%3===0?-1:1,glasses[i].contact,undefined,this.geometry.localScale(i));}
     for(const glass of glasses)glass.response=null;
     const frame=this.frame;frame.streams.length=0;frame.flights.length=0;
     for(const active of this.activeFlights){
       const progress=clamp01((now-active.started)/(active.kind==='undo'?UNDO_MS:POUR_MS));
       const transfer=active.kind==='undo'?undoTransferAt(progress):transferAt(progress);
-      const activeDirection=pourDirection(active.source,active.target);
+      const activeDirection=this.geometry.pourDirection(active.source,active.target);
       const presentation=active.presentation;presentation.progress=progress;presentation.transfer=transfer;presentation.stream=null;
       frame.flights.push(presentation);
     if(active.kind==='pour'){
       const receiver=glasses[active.target];
       const impactX=progress>STREAM_START&&progress<STREAM_END?
-        pouringLip(glasses[active.source].pose,activeDirection,active.stream.start).x:receiver.pose.x;
-      prepareSurfaceContact(receiver,activeDirection,receiver.contact,impactX);
+        this.geometry.pouringLip(glasses[active.source].pose,activeDirection,active.stream.start,active.source).x:receiver.pose.x;
+      prepareSurfaceContact(receiver,activeDirection,receiver.contact,impactX,this.geometry.localScale(active.target));
     }
     let stream:StreamFrame|null=null;
     let responseIntensity=0;
@@ -497,7 +520,7 @@ export class StilllightModel{
     }
     if(!this.reducedMotion&&active?.kind==='pour'&&progress>STREAM_START&&progress<STREAM_END){
       const moving=glasses[active.source],contact=glasses[active.target].contact,direction=activeDirection,q=clamp01((progress-STREAM_START)/(STREAM_END-STREAM_START));
-      stream=active.stream;pouringLip(moving.pose,direction,stream.start);
+      stream=active.stream;this.geometry.pouringLip(moving.pose,direction,stream.start,active.source);
       stream.end.x=contact.world.x;stream.end.y=contact.world.y;
       streamControl(stream.start,stream.end,direction,stream.control);
       stream.visible=true;stream.color=active.color;stream.alpha=Math.max(0,Math.min(1,q*7,(1-q)*7));
@@ -512,6 +535,8 @@ export class StilllightModel{
 
   advanceAfterFrame(now:number){
     let changed=false;
+    if(this.resetDipAt!==null&&now-this.resetDipAt>=260+30*(this.board.length-1)){this.resetDipAt=null;changed=true;}
+    if(this.undoShimmer&&now-this.undoShimmer.started>=400){this.undoShimmer=null;changed=true;}
     for(let i=0;i<this.activeFlights.length;){
       const active=this.activeFlights[i];
       if(clamp01((now-active.started)/(active.kind==='undo'?UNDO_MS:POUR_MS))<1){i++;continue;}
@@ -527,9 +552,9 @@ export class StilllightModel{
       changed=true;
     }
     const invalid=this.invalidMotion;if(invalid&&clamp01((now-invalid.started)/INVALID_MS)>=1){this.invalidMotion=null;this.invalidSource=this.invalidTarget=null;this.record('invalid-complete');changed=true;}
-    const pulse=this.selectionPulse;if(pulse&&clamp01((now-pulse.started)/SELECT_MS)>=1){this.selectionPulse=null;this.record('selection-complete');changed=true;}
+    const pulse=this.selectionPulse;if(pulse&&clamp01((now-pulse.started)/this.selectionMs)>=1){this.selectionPulse=null;this.record('selection-complete');changed=true;}
     for(let i=0;i<this.settlingPairs.length;){const settle=this.settlingPairs[i];if(now-settle.started>=SETTLE_MS){this.settlingPairs.splice(i,1);this.record('settle-complete');changed=true;}else i++;}
-    const hint=this.hintMotion;if(hint&&clamp01((now-hint.started)/HINT_ATTENTION_MS)>=1){this.hintMotion=null;this.record('hint-complete');changed=true;}
+    const hint=this.hintMotion;if(hint&&clamp01((now-hint.started)/this.hintMs)>=1){this.hintMotion=null;this.record('hint-complete');changed=true;}
     for(let i=0;i<this.poseCorrections.length;i++){const correction=this.poseCorrections[i];if(correction&&now-correction.started>=correction.duration){this.poseCorrections[i]=null;changed=true;}}
     for(let i=0;i<this.surfaceCorrections.length;i++){const correction=this.surfaceCorrections[i];if(correction&&now-correction.started>=correction.duration){this.surfaceCorrections[i]=null;changed=true;}}
     for(let i=0;i<this.capMotions.length;i++){const motion=this.capMotions[i];if(motion&&now-motion.started>=(motion.kind==='enter'?CAP_ENTER_MS:CAP_EXIT_MS)){this.capMotions[i]=null;changed=true;}}
@@ -540,5 +565,5 @@ export class StilllightModel{
     }
     return changed;
   }
-  isAnimating(){return!!(this.flight||this.invalidMotion||this.selectionPulse||this.settleMotion||this.hintMotion||this.poseCorrections.some(Boolean)||this.surfaceCorrections.some(Boolean)||this.capMotions.some(Boolean)||this.completionMotions.some(Boolean));}
+  isAnimating(){return!!(this.resetDipAt!==null||this.undoShimmer||this.flight||this.invalidMotion||this.selectionPulse||this.settleMotion||this.hintMotion||this.poseCorrections.some(Boolean)||this.surfaceCorrections.some(Boolean)||this.capMotions.some(Boolean)||this.completionMotions.some(Boolean));}
 }
