@@ -1,0 +1,6 @@
+
+> stilllight-web@1.0.1 verify:product
+> node --experimental-strip-types scripts/verification/verify-product-recovery.mjs
+
+PASS webgl: actual buy/equip/preview/name/avatar/claim persistence, chapter payoff, corrupt/unsupported/quota/read-denied recovery, reset cancel/confirm and unrelated storage preservation
+PASS canvas: actual buy/equip/preview/name/avatar/claim persistence, chapter payoff, corrupt/unsupported/quota/read-denied recovery, reset cancel/confirm and unrelated storage preservation

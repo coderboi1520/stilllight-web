@@ -1,0 +1,43 @@
+
+> stilllight-web@1.0.1 verify:campaign
+> node --experimental-strip-types scripts/verification/verify-campaign.mjs
+
+[
+  {
+    "backend": "webgl",
+    "width": 400,
+    "height": 889,
+    "result": "PASS routes/tutorial/input/Undo/reload/preserved run/replay/placeholders/silent/idle/targets"
+  },
+  {
+    "backend": "webgl",
+    "width": 450,
+    "height": 1000,
+    "result": "PASS routes/tutorial/input/Undo/reload/preserved run/replay/placeholders/silent/idle/targets"
+  },
+  {
+    "backend": "webgl",
+    "width": 400,
+    "height": 778,
+    "result": "PASS routes/tutorial/input/Undo/reload/preserved run/replay/placeholders/silent/idle/targets"
+  },
+  {
+    "backend": "canvas",
+    "width": 400,
+    "height": 889,
+    "result": "PASS routes/tutorial/input/Undo/reload/preserved run/replay/placeholders/silent/idle/targets"
+  },
+  {
+    "backend": "canvas",
+    "width": 450,
+    "height": 1000,
+    "result": "PASS routes/tutorial/input/Undo/reload/preserved run/replay/placeholders/silent/idle/targets"
+  },
+  {
+    "backend": "canvas",
+    "width": 400,
+    "height": 778,
+    "result": "PASS routes/tutorial/input/Undo/reload/preserved run/replay/placeholders/silent/idle/targets"
+  }
+]
+PASS legacy concurrent migration/Undo and actual final campaign Next/end

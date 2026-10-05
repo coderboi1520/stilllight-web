@@ -1,0 +1,2 @@
+PASS webgl: genuine eight-vessel development fixture at 390/320, level 12, OS Motion override, native keyboard selection, protected save bytes unchanged
+PASS canvas: genuine eight-vessel development fixture at 390/320, level 12, OS Motion override, native keyboard selection, protected save bytes unchanged

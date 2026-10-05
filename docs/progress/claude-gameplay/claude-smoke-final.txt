@@ -1,0 +1,24 @@
+
+> stilllight-web@1.0.1 verify:smoke
+> node scripts/verification/verify-ordinary-fixes.mjs && node scripts/verification/verify-transparent-glass.mjs && node scripts/verification/verify-vessel-labels.mjs && npm run verify:routes
+
+webgl focus: {"focused":true,"outline":"none","visualChildren":0}
+PASS webgl: keyboard focus, no legend, free pair input, overlapping streams, contact once per flight, exact two-step Undo, mid-flight restart, manual silence, portrait bounds and zero idle RAF
+canvas focus: {"focused":true,"outline":"none","visualChildren":0}
+PASS canvas: keyboard focus, no legend, free pair input, overlapping streams, contact once per flight, exact two-step Undo, mid-flight restart, manual silence, portrait bounds and zero idle RAF
+webgl empty-glass pixels: [[26,31,40],[27,32,39],[23,28,35]]
+canvas empty-glass pixels: [[26,31,40],[27,32,39],[23,27,35]]
+PASS transparent fallback: empty-vessel backdrop agrees with accepted Pixi material; both two-stream captures recorded
+PASS vessel labels: both backends omit rendered numerals while retaining genuine semantic controls, keyboard selection and parallel flights
+
+> stilllight-web@1.0.1 verify:routes
+> node scripts/verification/verify-retired-routes.mjs
+
+PASS retired /debug.html: current-game SPA fallback only
+PASS retired /reference/original/index.html: current-game SPA fallback only
+PASS retired /reference/original/debug-host.html: current-game SPA fallback only
+PASS retired /benchmark/original-canvas/index.html: current-game SPA fallback only
+PASS retired /benchmark/pixi-retained/index.html: current-game SPA fallback only
+PASS retired /src/debug/ParityHarness.ts: current-game SPA fallback only
+PASS retired /reference/original/src/main.js: current-game SPA fallback only
+PASS retired /benchmark/pixi-retained/main.js: current-game SPA fallback only

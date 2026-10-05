@@ -1,0 +1,110 @@
+[
+  {
+    "backend": "webgl",
+    "width": 320,
+    "height": 568,
+    "result": "PASS painted bounds/font/semantics/medallion arc/modal focus/inert/return"
+  },
+  {
+    "backend": "webgl",
+    "width": 360,
+    "height": 640,
+    "result": "PASS painted bounds/font/semantics/medallion arc/modal focus/inert/return"
+  },
+  {
+    "backend": "webgl",
+    "width": 375,
+    "height": 667,
+    "result": "PASS painted bounds/font/semantics/medallion arc/modal focus/inert/return"
+  },
+  {
+    "backend": "webgl",
+    "width": 390,
+    "height": 844,
+    "result": "PASS painted bounds/font/semantics/medallion arc/modal focus/inert/return"
+  },
+  {
+    "backend": "webgl",
+    "width": 430,
+    "height": 932,
+    "result": "PASS painted bounds/font/semantics/medallion arc/modal focus/inert/return"
+  },
+  {
+    "backend": "webgl",
+    "width": 768,
+    "height": 1024,
+    "result": "PASS painted bounds/font/semantics/medallion arc/modal focus/inert/return"
+  },
+  {
+    "backend": "webgl",
+    "width": 400,
+    "height": 889,
+    "result": "PASS painted bounds/font/semantics/medallion arc/modal focus/inert/return"
+  },
+  {
+    "backend": "webgl",
+    "width": 450,
+    "height": 1000,
+    "result": "PASS painted bounds/font/semantics/medallion arc/modal focus/inert/return"
+  },
+  {
+    "backend": "webgl",
+    "width": 400,
+    "height": 778,
+    "result": "PASS painted bounds/font/semantics/medallion arc/modal focus/inert/return"
+  },
+  {
+    "backend": "canvas",
+    "width": 320,
+    "height": 568,
+    "result": "PASS painted bounds/font/semantics/medallion arc/modal focus/inert/return"
+  },
+  {
+    "backend": "canvas",
+    "width": 360,
+    "height": 640,
+    "result": "PASS painted bounds/font/semantics/medallion arc/modal focus/inert/return"
+  },
+  {
+    "backend": "canvas",
+    "width": 375,
+    "height": 667,
+    "result": "PASS painted bounds/font/semantics/medallion arc/modal focus/inert/return"
+  },
+  {
+    "backend": "canvas",
+    "width": 390,
+    "height": 844,
+    "result": "PASS painted bounds/font/semantics/medallion arc/modal focus/inert/return"
+  },
+  {
+    "backend": "canvas",
+    "width": 430,
+    "height": 932,
+    "result": "PASS painted bounds/font/semantics/medallion arc/modal focus/inert/return"
+  },
+  {
+    "backend": "canvas",
+    "width": 768,
+    "height": 1024,
+    "result": "PASS painted bounds/font/semantics/medallion arc/modal focus/inert/return"
+  },
+  {
+    "backend": "canvas",
+    "width": 400,
+    "height": 889,
+    "result": "PASS painted bounds/font/semantics/medallion arc/modal focus/inert/return"
+  },
+  {
+    "backend": "canvas",
+    "width": 450,
+    "height": 1000,
+    "result": "PASS painted bounds/font/semantics/medallion arc/modal focus/inert/return"
+  },
+  {
+    "backend": "canvas",
+    "width": 400,
+    "height": 778,
+    "result": "PASS painted bounds/font/semantics/medallion arc/modal focus/inert/return"
+  }
+]
