@@ -1,5 +1,7 @@
 # STILLLIGHT current director plan
 
+Latest owner direction — 2026-10-07: final local acceptance passed, followed by explicit authorization to integrate sound effects, music and haptics and test on web first. Vibration is enabled through supported browser APIs and has an in-game option; physical-device testing follows with the owner. [Current feedback record](../progress/FEEDBACK_WEB_ACCEPTANCE.md) supersedes the historical silent-feedback scope below. Claude gameplay design remains locked; deployment/Android packaging, commerce/ads/accounts/cloud/rankings and other mechanics remain deferred.
+
 ## Active owner authorization â€” 2026-10-05
 
 Build and deliver the complete Aâ€“Z local ordinary-game candidate in one continuous run, without intermediate product approval gates. This supersedes earlier P2 stops, the three-commission ceiling, Home glass props, active sound work and separate campaign authorization. One Sol implementer owns product/design/integration; Worktree OFF. At most two small Luna read-only mechanical helpers are permitted; one was used. Full product review remains the implementer's responsibility.

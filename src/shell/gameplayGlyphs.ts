@@ -1,4 +1,5 @@
 const glyphs:Record<string,string>={
+ music:'<path d="M9 17V5l11-2v12M9 9l11-2"/><ellipse cx="6" cy="18" rx="3" ry="2"/><ellipse cx="17" cy="16" rx="3" ry="2"/>',
  hint:'<path d="M12 3.5c3.6 3.2 5.2 5.6 5.2 8.2a5.2 5.2 0 0 1-10.4 0c0-1.6.8-3.2 2.4-4.6.3 1.3.9 2 1.7 2.4C10.6 7.6 11 5.6 12 3.5Z"/><path d="M12 10c2 2 2.6 3.1 2.6 4.3a2.6 2.6 0 0 1-5.2 0c0-1.1 1-2.2 2.6-4.3Z" fill="currentColor" stroke="none" opacity=".6"/><path d="M9.4 20.5h5.2"/>',
  undo:'<path d="M9 7h5.5a4.5 4.5 0 0 1 0 9H8M9.2 3.6 5.4 7l3.8 3.4"/>',
  restart:'<path d="M19.5 12a7.5 7.5 0 1 1-2.4-5.5M19.6 4.2v3.8h-3.8"/><path d="M13 9a3 3 0 1 0 2 5 3 3 0 0 1-2-5Z" fill="currentColor" stroke="none"/>',

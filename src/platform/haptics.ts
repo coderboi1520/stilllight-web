@@ -10,6 +10,7 @@ export type HapticKind =
 
 export interface HapticBackend {
   perform(kind: HapticKind): void | Promise<void>;
+  cancel?(): void | Promise<void>;
 }
 
 const THROTTLE_MS: Record<HapticKind, number> = {
@@ -37,6 +38,7 @@ const BROWSER_PATTERNS: Record<HapticKind, number[]> = {
 };
 
 const browserBackend: HapticBackend = {
+  cancel() { if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') navigator.vibrate(0); },
   perform(kind) {
     if (typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') return;
     navigator.vibrate(BROWSER_PATTERNS[kind]);
@@ -45,6 +47,7 @@ const browserBackend: HapticBackend = {
 
 export class HapticEngine {
   private enabled: boolean;
+  private background = false;
   private readonly backend: HapticBackend;
   private readonly lastAt = new Map<HapticKind, number>();
 
@@ -55,12 +58,16 @@ export class HapticEngine {
 
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
+    if (!enabled) this.cancel();
   }
+
+  setBackground(background: boolean): void { this.background = background; if (background) this.cancel(); }
+  private cancel(): void { try { void Promise.resolve(this.backend.cancel?.()).catch(() => undefined); } catch {} }
 
   // The presenter deduplicates transaction/cap events; a shared time throttle
   // must not discard a different vessel's concurrent contact.
   trigger(kind: HapticKind, force = false, deduplicated = false): void {
-    if (!this.enabled && !force) return;
+    if (this.background || !this.enabled && !force) return;
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
     const last = this.lastAt.get(kind) ?? -Infinity;
     if (!deduplicated && now - last < THROTTLE_MS[kind]) return;

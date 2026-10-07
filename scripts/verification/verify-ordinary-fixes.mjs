@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {withVerificationHarness} from './browser-harness.mjs';
 const disableWebGL=()=>{const get=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(type,...args){if(['webgl','webgl2','experimental-webgl'].includes(type))return null;return get.call(this,type,...args);};};
-const probe=()=>{window.__feedback=[];Object.defineProperty(navigator,'vibrate',{configurable:true,value:p=>{window.__feedback.push(p.join(','));return true;}});const raf=requestAnimationFrame;window.__rafCount=0;window.requestAnimationFrame=cb=>{window.__rafCount++;return raf(cb);};};
+const probe=()=>{localStorage.setItem('stilllight.sound.enabled','true');localStorage.setItem('stilllight.haptics.enabled','true');localStorage.setItem('stilllight.music.enabled','false');window.__feedback=[];Object.defineProperty(navigator,'vibrate',{configurable:true,value:p=>{window.__feedback.push(Array.isArray(p)?p.join(','):String(p));return true;}});const raf=requestAnimationFrame;window.__rafCount=0;window.requestAnimationFrame=cb=>{window.__rafCount++;return raf(cb);};};
 await withVerificationHarness({},async h=>{
  const dir=await h.artifactDir('ordinary-fixes');
  for(const backend of ['webgl','canvas']){
@@ -31,8 +31,7 @@ await withVerificationHarness({},async h=>{
   await b(2).click();await b(5).click();
   assert.equal(await page.getByRole('button',{name:'Undo',exact:true}).isEnabled(),false);
   await page.waitForTimeout(1750);
-  assert.equal(await page.evaluate(()=>window.__STILLLIGHT_SESSION__.state().feedback.contact),2,'one presented contact for each accepted flight');
-  assert.equal(await page.evaluate(()=>window.__feedback.length),0,'silent candidate suppresses haptic dispatch');
+  assert.equal(await page.evaluate(()=>window.__feedback.filter(pattern=>pattern==='16,14,10').length),2,'two presented pour contacts dispatch the contact haptic pattern');
   await page.evaluate(()=>{window.__rafCount=0;});await page.waitForTimeout(400);
   assert.equal(await page.evaluate(()=>window.__rafCount),0,'concurrent pours return to idle');
   const undo=()=>page.getByRole('button',{name:'Undo',exact:true}).click();

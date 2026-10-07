@@ -33,7 +33,7 @@ export async function resolveChromiumExecutable() {
 }
 
 export async function withVerificationHarness(options, fn) {
-  const artifactsRoot = path.join(root, 'artifacts', 'verification');
+  const artifactsRoot = process.env.STILLLIGHT_ARTIFACTS ? path.resolve(process.env.STILLLIGHT_ARTIFACTS) : path.join(root, 'artifacts', 'verification');
   await mkdir(artifactsRoot, { recursive: true });
   let server = null, browser = null;
   try {

@@ -4,6 +4,14 @@ import {HapticEngine, type HapticBackend, type HapticKind} from '../src/platform
 
 const kinds: HapticKind[] = ['select', 'uiClick', 'pourContact', 'reject', 'glassComplete', 'levelComplete', 'toggleOn', 'toggleOff'];
 
+test('Off cancels an active vibration and background state blocks even forced cues',()=>{
+ const calls:HapticKind[]=[];let cancelled=0;
+ const engine=new HapticEngine(true,{perform:kind=>{calls.push(kind);},cancel:()=>{cancelled++;}});
+ engine.trigger('select');engine.setEnabled(false);assert.equal(cancelled,1);engine.trigger('reject');assert.deepEqual(calls,['select']);
+ engine.setEnabled(true);engine.setBackground(true);engine.trigger('uiClick',true);assert.equal(cancelled,2);assert.deepEqual(calls,['select']);
+ engine.setBackground(false);engine.trigger('uiClick');assert.deepEqual(calls,['select','uiClick']);
+});
+
 function withNow(run: (setNow: (value: number) => void) => void) {
   const original = Object.getOwnPropertyDescriptor(globalThis, 'performance');
   let now = 0;

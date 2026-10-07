@@ -1,8 +1,7 @@
 import type {AudioEvent} from './audio.ts';
 import type {HapticKind} from './haptics.ts';
-export const FEEDBACK_CAPABILITIES=Object.freeze({audio:false,haptics:false});
-// Existing backends and preferences remain intact; every user/runtime dispatch
-// crosses this release capability boundary. No AudioContext unlock in silence.
+export const FEEDBACK_CAPABILITIES=Object.freeze({audio:true,haptics:true});
+// Owner-authorized feedback; engines enforce preferences, activation and lifecycle.
 export class FeedbackCapability{
  private audio:{unlock:()=>unknown;play:(e:AudioEvent,t:number)=>unknown};
  private haptics:{trigger:(e:HapticKind,...args:any[])=>unknown};

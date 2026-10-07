@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.json && vite build",
     "test": "node --experimental-strip-types --test tests/*.test.mts tests/*.test.mjs",
     "verify:gameplay": "node --experimental-strip-types scripts/verification/verify-claude-gameplay.mjs",
+    "verify:feedback": "node scripts/verification/verify-feedback.mjs",
     "verify:fast": "npm run build && npm test",
     "verify:viewport": "node scripts/verification/verify-viewport-dpr.mjs",
     "verify:context": "node scripts/verification/verify-context-restore.mjs",

@@ -23,7 +23,7 @@ import {SessionStore} from './session/storage.ts';
 import {commission,COMMISSIONS,levelIndex} from './session/content.ts';
 import {solve} from './session/solver.ts';
 import {ShellViews,type Screen} from './shell/views.ts';
-import {EventAudio,readSound,SOUND_KEY,type AudioEvent} from './platform/audio.ts';
+import {EventAudio,readSound,readMusic,SOUND_KEY,MUSIC_KEY,type AudioEvent} from './platform/audio.ts';
 import {FeedbackCapability} from './platform/feedbackCapability.ts';
 import {finishColors} from './session/catalog.ts';
 import {buy,equip,claimAchievement,claimDaily,claimWeek,attend} from './session/product.ts';
@@ -51,13 +51,13 @@ let hapticsEnabled=readHapticsEnabled();
 const haptics=new HapticEngine(hapticsEnabled);
 const contactFlights=new WeakSet<object>();
 let completed=session.completed;
-let soundEnabled=readSound(),preferenceError:string|null=null;
+let soundEnabled=readSound(),musicEnabled=readMusic(),preferenceError:string|null=null;
 const pendingPreferences=new Map<string,boolean>();
-const audio=new EventAudio(soundEnabled);
+const audio=new EventAudio(soundEnabled,undefined,musicEnabled);
 const feedback=new FeedbackCapability(audio,haptics);
 const hud=new GameplayHud(document.querySelector<HTMLElement>('.atelier')!,{
- state:()=>({level:claudeFixture?12:levelIndex(session.id)+1,busy:model.busy||!!model.settleMotion,completed:session.completed,canUndo:model.canUndo(performance.now()),sound:soundEnabled,vibration:hapticsEnabled,reduced:model.reducedMotion,osReduced:osMotion.matches}),
- run:name=>action(name==='restart-confirmed'?'restart':name,name==='restart-confirmed'),preference:name=>action(name),home:()=>navigate('home'),settingsOpened:()=>{shell.reopenStorage();storageMessage();},invalidate:()=>invalidateScene()
+ state:()=>({level:claudeFixture?12:levelIndex(session.id)+1,busy:model.busy||!!model.settleMotion,completed:session.completed,canUndo:model.canUndo(performance.now()),sound:soundEnabled,music:musicEnabled,vibration:hapticsEnabled,reduced:model.reducedMotion,osReduced:osMotion.matches}),
+ run:name=>action(name==='restart-confirmed'?'restart':name,name==='restart-confirmed'),preference:name=>action(name),home:()=>navigate('home'),settingsOpened:()=>{shell.reopenStorage();storageMessage();feedback.haptic('uiClick');sound('ui');},invalidate:()=>invalidateScene()
 });
 osMotion.addEventListener('change',()=>{reducedMotionEnabled=storedReduced||osMotion.matches;model.reducedMotion=reducedMotionEnabled;refresh();updateControls();schedule();});
 attend(session.product);
@@ -84,7 +84,7 @@ function updateControls(){
   control('hint').disabled=model.busy||!!model.settleMotion;
   control('undo').disabled=!model.canUndo(performance.now());
   if(!reference){document.querySelector('.move-count')!.textContent=`${model.moveCount} moves · ${session.hints} hints · 3★ target ${commission(session.id).target}`;shell.guide(session);}
-  for(const [name,on] of [['motion',model.reducedMotion]] as const){control(name).setAttribute('aria-pressed',String(on));control(name).querySelector('span')!.textContent=on?'On':'Off';}
+  for(const [name,on] of [['sound',soundEnabled],['music',musicEnabled],['haptics',hapticsEnabled],['motion',model.reducedMotion]] as const){control(name).setAttribute('aria-pressed',String(on));control(name).querySelector('span')!.textContent=on?'On':'Off';}
 }
 let lastRenderedTime=performance.now();
 let lastPresentedFrame:ReturnType<StilllightModel['sample']>|null=null;
@@ -138,9 +138,10 @@ function action(name:string,confirmed=false){
   if(name==='hint'&&!model.busy&&!model.settleMotion){const result=solve(model.board);const pair=result.path[0];if(pair&&model.showHint(...pair,now)){session.hints++;glassButtons.forEach((b,i)=>b.dataset.hintSource=String(i===pair[0]));save();status.textContent=`Hint: vessel ${pair[0]+1} to vessel ${pair[1]+1}, a step toward settling every color.`;feedback.haptic('uiClick');sound('ui');}else status.textContent=result.kind==='unknown'?'Hint search reached its limit. Try a legal pour, Undo or Restart.':result.kind==='blocked'?'No solution from this board. Undo or Restart to recover.':'Every color is already settled.';}
   if(name==='undo'&&model.undo(now)){completed=false;session.completed=false;status.textContent='Previous pour restored.';feedback.haptic('uiClick');sound('ui');save();}
   if(name==='restart'){if(!confirmed&&!reference){hud.requestResetKey();return;}model.reset();model.showResetDip(now);session.completed=false;session.hints=0;completed=false;status.textContent='Commission restarted.';feedback.haptic('uiClick');sound('ui');save();}
-  if(name==='haptics'){hapticsEnabled=!hapticsEnabled;haptics.setEnabled(hapticsEnabled);writeHapticsEnabled(hapticsEnabled);feedback.haptic(hapticsEnabled?'toggleOn':'toggleOff',true);}
+  if(name==='haptics'){hapticsEnabled=!hapticsEnabled;haptics.setEnabled(hapticsEnabled);writeHapticsEnabled(hapticsEnabled);if(hapticsEnabled)feedback.haptic('toggleOn');}
   if(name==='motion'){storedReduced=!storedReduced;reducedMotionEnabled=storedReduced||osMotion.matches;model.reducedMotion=reducedMotionEnabled;writeReducedMotion(storedReduced);feedback.haptic('uiClick');}
   if(name==='sound'){soundEnabled=!soundEnabled;audio.setEnabled(soundEnabled);writePreference(SOUND_KEY,soundEnabled);if(soundEnabled)void feedback.unlock();}
+  if(name==='music'){musicEnabled=!musicEnabled;audio.setMusicEnabled(musicEnabled);writePreference(MUSIC_KEY,musicEnabled);if(musicEnabled)void feedback.unlock();}
   if(name==='haptics')writePreference('stilllight.haptics.enabled',hapticsEnabled);
   if(name==='motion')writePreference('stilllight.motion.reduced',storedReduced);
   updateControls();refresh();schedule();
@@ -148,7 +149,7 @@ function action(name:string,confirmed=false){
 function writePreference(key:string,value:boolean){pendingPreferences.set(key,value);try{localStorage.setItem(key,String(value));pendingPreferences.delete(key);preferenceError=pendingPreferences.size?'A preference could not be saved. Retry saving when storage is available.':null;}catch{preferenceError='This preference works now but could not be saved. Storage is unavailable.';}}
 
 function navigate(name:string){
- if(!ready||frameGate.isParity())return;void feedback.unlock();sound('ui');
+ if(!ready||frameGate.isParity())return;void feedback.unlock();sound('ui');feedback.haptic('uiClick');
  if(name==='memory'){shell.keepPlayingInMemory();status.textContent='Playing in memory. Open Settings to retry saving.';return;}
  if(name==='retry'){if(store.recovery==='new'&&!confirm('Start a new save? Unreadable save bytes stay preserved for recovery.'))return;for(const [k,v] of pendingPreferences)writePreference(k,v);store.save(session.snapshot(),true);storageMessage();return;}
  if(name==='play'){if(session.campaignComplete){shell.show('end');}else{session.home();session.start();adoptModel();shell.show('game');status.textContent=session.completed?'Level complete. Every color is settled.':'Sort each color into a full glass.';save();}}
@@ -187,7 +188,7 @@ document.querySelector('.atelier')!.addEventListener('click',e=>{
  if(b.dataset.avatar){session.product.avatar=b.dataset.avatar;changed=true;}
  if(b.dataset.achievement)changed=claimAchievement(session.product,b.dataset.achievement);
  if(b.dataset.daily)changed=claimDaily(session.product,Number(b.dataset.daily));
- if(changed){save();refresh();updateControls();}
+ if(changed){feedback.haptic('uiClick');sound('ui');save();refresh();updateControls();}
 });
 document.querySelector('.atelier')!.addEventListener('submit',e=>{if(!(e.target as HTMLElement).matches('.profile-form'))return;e.preventDefault();const input=document.querySelector<HTMLInputElement>('#profile-name')!;const name=input.value.trim().replace(/[<>\u0000-\u001f]/g,'').slice(0,24);if(!name){input.setCustomValidity('Choose a name of 1–24 characters.');input.reportValidity();return;}input.setCustomValidity('');session.product.name=name;save();refresh();});
 window.addEventListener('keydown',e=>{if(e.key==='Escape'){const preview=document.querySelector<HTMLElement>('.preview-modal');if(preview&&!preview.hidden){shell.closePreview();return;}if(!['home','game','journey','shop','profile'].includes(shell.screen))navigate('back');}});
@@ -206,11 +207,15 @@ const viewport=new ViewportController(board,s=>{syncGameplay();renderer.resize(s
 if(!reference)shell.show('home');else shell.show('game');refresh();
 viewport.start();
 window.addEventListener('resize',()=>{shell.layout();syncGameplay();shell.guide(session);viewport.sync();invalidateScene();});
-window.addEventListener('pagehide',()=>{if(!frameGate.isParity())save();audio.setBackground(true);});
-document.addEventListener('visibilitychange',()=>{audio.setBackground(document.hidden);if(document.hidden){if(!frameGate.isParity())save();}else if(!frameGate.isParity()){attend(session.product);save();model.restoreState(model.exportState());refresh();renderAt(performance.now(),false,false);schedule();}});
+const unlockFeedback=()=>{if(ready&&!document.hidden&&!frameGate.isParity())void feedback.unlock();};
+document.addEventListener('pointerdown',e=>{if(e.isTrusted&&e.isPrimary&&e.button===0)unlockFeedback();},{capture:true});
+document.addEventListener('keydown',e=>{if(e.isTrusted&&!e.repeat&&!e.ctrlKey&&!e.metaKey&&!e.altKey)unlockFeedback();},{capture:true});
+window.addEventListener('pagehide',e=>{if(!frameGate.isParity())save();audio.setBackground(true);haptics.setBackground(true);if(!e.persisted)void audio.dispose();});
+window.addEventListener('pageshow',()=>{audio.setBackground(document.hidden||frameGate.isParity());haptics.setBackground(document.hidden||frameGate.isParity());});
+document.addEventListener('visibilitychange',()=>{audio.setBackground(document.hidden||frameGate.isParity());haptics.setBackground(document.hidden||frameGate.isParity());if(document.hidden){if(!frameGate.isParity())save();}else if(!frameGate.isParity()){attend(session.product);save();model.restoreState(model.exportState());refresh();renderAt(performance.now(),false,false);schedule();}});
 
-function enterParity(){if(frameGate.isParity())return;frameGate.enterParity();document.querySelector('.atelier')!.classList.add('manual-frame');metrics.last=0;}
-function exitParity(){if(!frameGate.isParity())return;frameGate.exitParity();document.querySelector('.atelier')!.classList.remove('manual-frame');lastRenderedTime=performance.now();renderAt(lastRenderedTime,false,false);if(model.isAnimating())schedule();}
+function enterParity(){if(frameGate.isParity())return;frameGate.enterParity();audio.setBackground(true);haptics.setBackground(true);document.querySelector('.atelier')!.classList.add('manual-frame');metrics.last=0;}
+function exitParity(){if(!frameGate.isParity())return;frameGate.exitParity();audio.setBackground(document.hidden);haptics.setBackground(document.hidden);document.querySelector('.atelier')!.classList.remove('manual-frame');lastRenderedTime=performance.now();renderAt(lastRenderedTime,false,false);if(model.isAnimating())schedule();}
 function debugAction(action:'reset'|'select'|'hint'|'invalid'|'pour'|'undo',now:number){enterParity();if(action==='reset')model.reset();if(action==='select')model.choose(0,now);if(action==='hint')model.hint(now);if(action==='invalid')model.invalid(now);if(action==='pour')model.startPour(now);if(action==='undo')model.undo(now);}
 let lastDebugFrame:ReturnType<typeof snapshotFrame>|null=null;
 function debugStep(now:number){enterParity();const frame=model.sample(now);renderer.render(frame);lastPresentedFrame=frame;lastRenderedTime=now;lastDebugFrame=snapshotFrame(frame);model.advanceAfterFrame(now);return lastDebugFrame;}
