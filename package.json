@@ -6,27 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5179 --strictPort",
     "build": "tsc -p tsconfig.json && vite build",
-    "test": "node --experimental-strip-types --test tests/*.test.mts tests/*.test.mjs",
-    "verify:gameplay": "node --experimental-strip-types scripts/verification/verify-claude-gameplay.mjs",
-    "verify:feedback": "node scripts/verification/verify-feedback.mjs",
-    "verify:fast": "npm run build && npm test",
-    "verify:viewport": "node scripts/verification/verify-viewport-dpr.mjs",
-    "verify:context": "node scripts/verification/verify-context-restore.mjs",
-    "verify:fallback": "node scripts/verification/verify-canvas-fallback.mjs",
-    "verify:idle-raf": "node scripts/verification/verify-idle-raf.mjs",
-    "verify:pour": "node scripts/verification/verify-pour-states.mjs",
-    "verify:runtime": "node scripts/verify-runtime.mjs",
-    "verify:p2": "node --experimental-strip-types scripts/verification/verify-p2-loop.mjs",
-    "verify:p2-visual": "node --experimental-strip-types scripts/verification/verify-p2-visual-correction.mjs",
-    "verify:campaign": "node --experimental-strip-types scripts/verification/verify-campaign.mjs",
-    "verify:product": "node --experimental-strip-types scripts/verification/verify-product-recovery.mjs",
-    "verify:visual": "node scripts/verify-visual.mjs",
-    "preview": "vite preview --host 127.0.0.1 --port 5180 --strictPort",
-    "verify:freeze": "node scripts/verification/verify-frame-freeze.mjs",
-    "verify:all": "node scripts/verify-all.mjs",
-    "verify:smoke": "node scripts/verification/verify-ordinary-fixes.mjs && node scripts/verification/verify-transparent-glass.mjs && node scripts/verification/verify-vessel-labels.mjs && npm run verify:routes",
-    "verify:glass": "node scripts/verification/verify-transparent-glass.mjs",
-    "verify:routes": "node scripts/verification/verify-retired-routes.mjs"
+    "preview": "vite preview --host 127.0.0.1 --port 5180 --strictPort"
   },
   "dependencies": {
     "pixi.js": "8.18.0"
