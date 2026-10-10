@@ -1,5 +1,5 @@
 import { Texture } from 'pixi.js';
-import {drawOpenWallPath,drawRim,drawBodyShadow,drawGlassRim,drawGlassBase,drawGlassEdge,drawGlassShine,makeSweepArtwork} from '../glassMaterial.ts';
+import {drawGlassGlow,drawBodyShadow,drawGlassRim,drawGlassBase,drawGlassEdge,drawGlassShine,makeSweepArtwork} from '../glassMaterial.ts';
 
 let assetDensity=Math.min(typeof devicePixelRatio==='number'&&devicePixelRatio>0?devicePixelRatio:1,2);
 const sharedTextures=new Map<string,{texture:Texture;references:number}>();
@@ -56,19 +56,10 @@ function glassSurfaceTexture(draw:(ctx:CanvasRenderingContext2D)=>void){
 }
 
 export function makeBodyShadowTexture(){return shared('body-shadow',()=>canvasTexture(drawBodyShadow));}
-export function makeGlowTexture(color:string,width:number,blur:number){
+export function makeGlowTexture(color:string,width:number,blur:number,includeStroke=true){
   // Canvas shadowBlur is device-space rather than transform-scaled. Bake at the
   // the scene's capped DPR so logical glow coverage matches at 1x/2x.
-  return shared(`glow:${color}:${width}:${blur}`,()=>canvasTexture(ctx=>{
-    ctx.strokeStyle=color;
-    ctx.lineWidth=width;
-    ctx.shadowColor=color;
-    ctx.shadowBlur=blur;
-    drawOpenWallPath(ctx);
-    ctx.stroke();
-    drawRim(ctx);
-    ctx.stroke();
-  },cappedDensity()));
+  return shared(`glow:${color}:${width}:${blur}:${includeStroke}`,()=>canvasTexture(ctx=>drawGlassGlow(ctx,color,width,blur,includeStroke),cappedDensity()));
 }
 
 export function makeGlassRimTexture(){return shared('glass-rim',()=>canvasTexture(drawGlassRim));}

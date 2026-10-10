@@ -102,7 +102,7 @@ export class GlassView{
     this.normalRim.position.set(-90,-36);
     this.normalRim.width=180;
     this.normalRim.height=230;
-    const selectedTexture=makeGlowTexture('#dfeaf1',2.4,20),hintSourceTexture=makeGlowTexture('#f2b24b',2.4,16),hintTargetTexture=makeGlowTexture('#bfd8e6',2.4,16),invalidTexture=makeGlowTexture('#FF9A8A',1.4,12);
+    const selectedTexture=makeGlowTexture('#dfeaf1',2.4,20),hintSourceTexture=makeGlowTexture('#f2b24b',2.4,16),hintTargetTexture=makeGlowTexture('#bfd8e6',2.4,16),invalidTexture=makeGlowTexture('#FF9A8A',1.4,12,false);
     this.ownedTextures.push(selectedTexture,hintSourceTexture,hintTargetTexture,invalidTexture);
     this.glows={selected:new Sprite(selectedTexture),hintSource:new Sprite(hintSourceTexture),hintTarget:new Sprite(hintTargetTexture),invalid:new Sprite(invalidTexture)};
     this.glowList=[this.glows.selected,this.glows.hintSource,this.glows.hintTarget,this.glows.invalid];

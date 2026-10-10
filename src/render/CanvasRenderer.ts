@@ -4,7 +4,7 @@ import type {GlassFrame,LiquidLayerFrame,RenderFrame,StreamFrame} from '../core/
 import {CAP_ART_SCALE,CAP_ART_WIDTH,CAP_SOURCE_BOTTOM} from './capArtwork.ts';
 import {backdropLayout} from './sceneBackdrop.ts';
 import {restorationArtwork} from './restoration.ts';
-import {drawInteriorGlassPath,makeGlassArtwork,makeRadialArtwork,makeSweepArtwork} from './glassMaterial.ts';
+import {drawInteriorGlassPath,makeGlassArtwork,makeRadialArtwork,makeSweepArtwork,makeInvalidGlowArtwork} from './glassMaterial.ts';
 import {makeVesselNumbers,NUMBER_HEIGHT,NUMBER_WIDTH,vesselNumberLayout} from './vesselNumbers.ts';
 import {workbenchProps,type Presentation} from './workbench.ts';
 import {tintedArtwork} from './tintedArtwork.ts';
@@ -21,6 +21,7 @@ export class CanvasRenderer{
   private canvas=document.createElement('canvas');
   private ctx=this.canvas.getContext('2d')!;
   private glassArtwork=makeGlassArtwork();
+  private invalidGlow=makeInvalidGlowArtwork();
   private radialArtwork=makeRadialArtwork();
   private sweepArtwork=makeSweepArtwork();
   private capGlint=document.createElement('canvas');
@@ -74,7 +75,7 @@ export class CanvasRenderer{
     ctx.drawImage(this.glassArtwork.base,-34,0,68,158);ctx.drawImage(tintedArtwork(this.glassArtwork.reflection,glassTint),-34+Math.max(-2,Math.min(2,-Math.sin(frame.pose.angle)*2)),0,68,158);ctx.drawImage(tintedArtwork(this.glassArtwork.edge,glassTint),-34,0,68,158);
     if(complete&&age>=0)this.light(ctx,-26,11.5,52,7,'#000000',.30*Math.min(1,age/90)*frame.cap.alpha);ctx.restore();
     const glow=frame.invalid?'#FF9A8A':frame.hintRole==='source'?'#f2b24b':frame.hintRole==='target'?'#bfd8e6':frame.selectionStrength>0?'#dfeaf1':null;
-    if(glow){ctx.save();ctx.globalAlpha=frame.invalid?.45*frame.invalidStrength:frame.hintRole?frame.hintStrength:1.25*frame.selectionStrength;ctx.shadowColor=glow;ctx.shadowBlur=frame.invalid?12:frame.hintRole?16:20;outline(ctx,glow,2.4,glow,2.4);ctx.restore();}
+    if(glow){ctx.save();ctx.globalAlpha=frame.invalid?.45*frame.invalidStrength:frame.hintRole?frame.hintStrength:1.25*frame.selectionStrength;if(frame.invalid)ctx.drawImage(this.invalidGlow,-90,-36,180,230);else{ctx.shadowColor=glow;ctx.shadowBlur=frame.hintRole?16:20;outline(ctx,glow,2.4,glow,2.4);}ctx.restore();}
     if(frame.invalid){ctx.save();ctx.translate(0,-2.5);ctx.scale(71/66,161/156);ctx.globalAlpha=(frame.invalidRole==='target'?.80:.45)*frame.invalidStrength;outline(ctx,'#FF9A8A',1.4,'#FF9A8A',1.4);ctx.restore();}
     else if(frame.selectionStrength>0){ctx.save();ctx.globalAlpha=frame.selectionStrength;outline(ctx,'#f1f6f8',2,'#ffffff',2);ctx.restore();}
     else{ctx.strokeStyle='rgba(217,233,240,.52)';ctx.lineWidth=1.25;openGlassPath(ctx);ctx.stroke();ctx.drawImage(tintedArtwork(this.glassArtwork.rim,glassTint),-90,-36,180,230);}

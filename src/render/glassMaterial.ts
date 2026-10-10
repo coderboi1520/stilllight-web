@@ -113,5 +113,14 @@ function artwork(draw:(ctx:CanvasRenderingContext2D)=>void,surface=false){
   const ctx=canvas.getContext('2d')!;ctx.save();ctx.scale(2,2);if(!surface)ctx.translate(90,36);draw(ctx);ctx.restore();return canvas;
 }
 export function makeGlassArtwork(){return{shadow:artwork(drawBodyShadow),rim:artwork(drawGlassRim),base:artwork(drawGlassBase,true),edge:artwork(drawGlassEdge,true),reflection:artwork(drawGlassShine,true)};}
+export function drawGlassGlow(ctx:CanvasRenderingContext2D,color:string,width:number,blur:number,includeStroke=true){
+  ctx.save();ctx.strokeStyle=color;ctx.lineWidth=width;ctx.shadowColor=color;ctx.shadowBlur=blur;
+  if(!includeStroke){
+    // Move the solid stroke outside the baked canvas; project only its soft shadow back.
+    const offset=ctx.canvas.width;ctx.shadowOffsetX=-offset*ctx.getTransform().a;ctx.translate(offset,0);
+  }
+  drawOpenWallPath(ctx);ctx.stroke();drawRim(ctx);ctx.stroke();ctx.restore();
+}
+export function makeInvalidGlowArtwork(){return artwork(ctx=>drawGlassGlow(ctx,'#FF9A8A',1.4,12,false));}
 export function makeRadialArtwork(){const canvas=document.createElement('canvas');canvas.width=canvas.height=128;const ctx=canvas.getContext('2d')!,g=ctx.createRadialGradient(64,64,0,64,64,64);g.addColorStop(0,'#ffffff');g.addColorStop(.3,'#ffffffb3');g.addColorStop(1,'#ffffff00');ctx.fillStyle=g;ctx.fillRect(0,0,128,128);return canvas;}
 export function makeSweepArtwork(){const canvas=document.createElement('canvas');canvas.width=canvas.height=128;const ctx=canvas.getContext('2d')!,g=ctx.createLinearGradient(0,0,128,0);g.addColorStop(0,'#ffffff00');g.addColorStop(.35,'#ffffff00');g.addColorStop(.5,'#ffffff');g.addColorStop(.65,'#ffffff00');g.addColorStop(1,'#ffffff00');ctx.fillStyle=g;ctx.fillRect(0,0,128,128);return canvas;}
