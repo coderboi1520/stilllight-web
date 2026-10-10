@@ -20,8 +20,10 @@ import {presentedPourContact} from './platform/presentedFeedback.ts';
 // Preserve the two original demo fixtures and ordinary rules.
 const MIXED_BOARD = INITIAL;
 const FINISH_BOARD = [[2, 2, 2], [2]];
-const mixed = new URLSearchParams(location.search).get('board') === 'mixed';
-const startBoard = () => (mixed ? MIXED_BOARD : FINISH_BOARD).map(b => [...b]);
+const THREE_BOARD = [[2, 2, 2], [1, 1, 1, 2], [1]];
+const boardName = new URLSearchParams(location.search).get('board');
+const mixed = boardName === 'mixed';
+const startBoard = () => (mixed ? MIXED_BOARD : boardName === 'three' ? THREE_BOARD : FINISH_BOARD).map(b => [...b]);
 
 async function start(){
  const root=document.querySelector<HTMLElement>('.atelier')!,boardHost=document.querySelector<HTMLElement>('.board')!,stage=document.querySelector<HTMLElement>('#pixi-host')!,hits=document.querySelector<HTMLElement>('.hit-glasses')!,status=document.querySelector<HTMLElement>('.status')!,result=document.querySelector<HTMLElement>('.result')!,replay=document.querySelector<HTMLButtonElement>('#replay-demo')!;
@@ -30,7 +32,7 @@ async function start(){
  const systemMotion=matchMedia('(prefers-reduced-motion: reduce)');let userReduced=readReducedMotion();
  const refreshMotion=()=>{model.reducedMotion=userReduced||systemMotion.matches;};refreshMotion();
  let soundEnabled=readSound(),musicEnabled=readMusic(),vibrationEnabled=readHapticsEnabled();
- const audio=new EventAudio(soundEnabled,undefined,musicEnabled),haptics=new HapticEngine(vibrationEnabled),feedback=new FeedbackCapability(audio,haptics),notifiedContacts=new WeakSet<object>(),renderer=new StageRenderer(2);
+ const audio=new EventAudio(soundEnabled,undefined,musicEnabled),haptics=new HapticEngine(vibrationEnabled),feedback=new FeedbackCapability(audio,haptics),notifiedContacts=new WeakSet<object>(),renderer=new StageRenderer(model.board.length);
  const sound=(event:AudioEvent,now=performance.now())=>{if(!document.hidden)feedback.sound(event,now);};
  const notify=(message:string)=>{status.textContent=message;};
  const allFinished=()=>model.board.every(g=>!g.length||isBottleComplete(g));
@@ -105,7 +107,7 @@ async function start(){
  const colorNames=['amber','rose','teal','violet'];
  const buttons=model.board.map((_,index)=>{const button=document.createElement('button');button.type='button';button.dataset.glass=String(index);button.addEventListener('click',()=>choose(index));hits.append(button);return button;});
  function syncLayout(){
-  const layout=gameplayLayout(innerWidth,innerHeight,2);model.setPresentationGeometry(layout.profile);renderer.setGameplayLayout(layout);
+  const layout=gameplayLayout(innerWidth,innerHeight,model.board.length);model.setPresentationGeometry(layout.profile);renderer.setGameplayLayout(layout);
   buttons.forEach((button,index)=>{const p=layout.homes[index],width=Math.max(44,layout.glassWidth*p.scale),height=156*layout.scale*p.scale;Object.assign(button.style,{left:p.x-width/2+'px',top:p.y-8+'px',width:width+'px',height:height+16+'px'});button.style.setProperty('--glass-width',layout.glassWidth*p.scale+'px');button.style.setProperty('--glass-height',height+'px');});hud.layout(layout.homes,layout.glassWidth);
  }
  function updateButtons(){
@@ -119,7 +121,7 @@ async function start(){
  window.addEventListener('resize',()=>{syncLayout();viewport.sync();invalidate();});systemMotion.addEventListener('change',()=>{refreshMotion();hud.update();invalidate();schedule();});
  document.addEventListener('visibilitychange',()=>{audio.setBackground(document.hidden);haptics.setBackground(document.hidden);if(document.hidden)input.clear();else{invalidate();schedule();}});window.addEventListener('pagehide',()=>{input.clear();audio.setBackground(true);haptics.setBackground(true);});
  replay.addEventListener('click',()=>{if(replay.disabled||replaying)return;void feedback.unlock();sound('ui');feedback.haptic('uiClick');input.clear();clearCompletion();replaying=true;root.classList.add('replaying');replay.disabled=true;result.animate(model.reducedMotion?[{opacity:1},{opacity:0}]:[{transform:'none',opacity:1},{transform:'translateY(24px)',opacity:0}],{duration:model.reducedMotion?140:220,fill:'forwards',easing:'cubic-bezier(.5,0,.75,0)'});later(()=>{resetGame();buttons[0].focus({preventScroll:true});},model.reducedMotion?140:400);});
- window.addEventListener('keydown',event=>{if(event.repeat||hud.modalOpen||event.target instanceof HTMLInputElement)return;const key=event.key.toLowerCase();if(key==='1'||key==='2'){event.preventDefault();choose(Number(key)-1);}if(key==='h')hud.requestAction('hint');if(key==='u'||key==='z'&&(event.ctrlKey||event.metaKey)){event.preventDefault();hud.requestAction('undo');}if(key==='r')hud.requestResetKey();});
- ready=true;hud.update();notify(mixed?'Mixed-color visual fixture. Not a solvable level.':'Select the larger glass, then the smaller glass to pour.');redraw(performance.now(),false);
+ window.addEventListener('keydown',event=>{if(event.repeat||hud.modalOpen||event.target instanceof HTMLInputElement)return;const key=event.key.toLowerCase();if(/^[1-9]$/.test(key)&&Number(key)<=model.board.length){event.preventDefault();choose(Number(key)-1);}if(key==='h')hud.requestAction('hint');if(key==='u'||key==='z'&&(event.ctrlKey||event.metaKey)){event.preventDefault();hud.requestAction('undo');}if(key==='r')hud.requestResetKey();});
+ ready=true;hud.update();notify(mixed?'Mixed-color visual fixture. Not a solvable level.':boardName==='three'?'Pour the middle glass into the left glass, then into the rose glass.':'Select the larger glass, then the smaller glass to pour.');redraw(performance.now(),false);
 }
 void start();

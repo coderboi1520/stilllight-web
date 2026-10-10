@@ -11,9 +11,10 @@ npm run dev
 
 Open http://127.0.0.1:5179/.
 
-Only the two-vessel board, moonlit artwork, original retained Pixi/WebGL + Canvas-fallback rendering, accepted authored liquid motion, brass/glass gameplay HUD, Settings casement, reset/Undo/Hint, deferred Skip notice, level-clear presentation, WebAudio feedback, ambient music and supported browser vibration are available. No Home, Journey, shop, profile, coins, leaderboard, campaign or unrelated product screens.
+Only the two-vessel fixtures and optional three-glass animation board, moonlit artwork, original retained Pixi/WebGL + Canvas-fallback rendering, accepted authored liquid motion, brass/glass gameplay HUD, Settings casement, reset/Undo/Hint, deferred Skip notice, level-clear presentation, WebAudio feedback, ambient music and supported browser vibration are available. No Home, Journey, shop, profile, coins, leaderboard, campaign or unrelated product screens.
 
 - **Default**: solvable two-glass demonstration `[[2,2,2],[2]]`; tap the larger glass then the smaller one to pour, complete, see cap/level-clear effects, and replay. Hint suggests the valid solution.
+- **Three-glass animation test**: open `/?board=three` for teal and rose liquids. Pour the middle glass into the left glass, then the middle into the right rose glass to test both pours, caps and completion. Keyboard keys `1`, `2`, `3` select the glasses; Undo, Reset, Hint and Replay work as usual.
 - **Colorful interaction / Undo screenshot fixture**: open http://127.0.0.1:5179/?board=mixed to load the original colorful two-glass arrangement `[[2,0,3],[3]]`; demonstrate selection, pouring, Hint, Undo, Reset, Settings, but it is **not mathematically solvable**, so its Hint shows a legal move without falsely promising completion.
 
 A nontrivial two-color water sort with only two vessels, capacity four and both colors totaling four each has no legal initial move unless already solved; the two fixtures avoid misrepresenting the game's rules. Production campaign levels use more vessels.
