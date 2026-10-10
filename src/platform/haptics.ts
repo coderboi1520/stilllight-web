@@ -6,7 +6,7 @@ export type HapticKind =
   | 'glassComplete'
   | 'levelComplete'
   | 'toggleOn'
-  | 'toggleOff';
+  | 'toggleOff' | 'undo' | 'hint' | 'resetTick' | 'resetConfirm';
 
 export interface HapticBackend {
   perform(kind: HapticKind): void | Promise<void>;
@@ -17,11 +17,12 @@ const THROTTLE_MS: Record<HapticKind, number> = {
   select: 26,
   uiClick: 36,
   pourContact: 90,
-  reject: 120,
+  reject: 800,
   glassComplete: 140,
   levelComplete: 360,
   toggleOn: 80,
   toggleOff: 80,
+  undo:80,hint:120,resetTick:60,resetConfirm:200,
 };
 
 // Vibration API patterns are brief semantic approximations; browser devices
@@ -35,6 +36,7 @@ const BROWSER_PATTERNS: Record<HapticKind, number[]> = {
   levelComplete: [12, 20, 28, 24, 10],
   toggleOn: [12, 20, 14],
   toggleOff: [20, 14],
+  undo:[12],hint:[10],resetTick:[8],resetConfirm:[24],
 };
 
 const browserBackend: HapticBackend = {
@@ -50,6 +52,7 @@ export class HapticEngine {
   private background = false;
   private readonly backend: HapticBackend;
   private readonly lastAt = new Map<HapticKind, number>();
+  private activeUntil = -Infinity;
 
   constructor(enabled: boolean, backend?: HapticBackend) {
     this.enabled = enabled;
@@ -57,21 +60,22 @@ export class HapticEngine {
   }
 
   setEnabled(enabled: boolean): void {
-    this.enabled = enabled;
     if (!enabled) this.cancel();
+    this.enabled = enabled;
   }
 
   setBackground(background: boolean): void { this.background = background; if (background) this.cancel(); }
-  private cancel(): void { try { void Promise.resolve(this.backend.cancel?.()).catch(() => undefined); } catch {} }
+  private cancel(): void { const now=typeof performance!=='undefined'?performance.now():Date.now();if(now>=this.activeUntil)return;this.activeUntil=-Infinity;try { void Promise.resolve(this.backend.cancel?.()).catch(() => undefined); } catch {} }
 
   // The presenter deduplicates transaction/cap events; a shared time throttle
   // must not discard a different vessel's concurrent contact.
   trigger(kind: HapticKind, force = false, deduplicated = false): void {
-    if (this.background || !this.enabled && !force) return;
+    if (this.background || !this.enabled) return;
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
     const last = this.lastAt.get(kind) ?? -Infinity;
     if (!deduplicated && now - last < THROTTLE_MS[kind]) return;
     this.lastAt.set(kind, now);
+    this.activeUntil=now+BROWSER_PATTERNS[kind].reduce((sum,part)=>sum+part,0);
     try {
       void Promise.resolve(this.backend.perform(kind)).catch(() => undefined);
     } catch {

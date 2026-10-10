@@ -41,14 +41,15 @@ export function drawBodyShadow(ctx:CanvasRenderingContext2D){
 export function drawGlassRim(ctx:CanvasRenderingContext2D){
   ctx.lineCap='round';
   drawRim(ctx);
-  ctx.strokeStyle='rgba(169,202,219,.34)';
+  ctx.strokeStyle='rgba(169,202,219,.28)';
   ctx.lineWidth=1.05;
   ctx.stroke();
   ctx.beginPath();
   ctx.ellipse(0,0,33,4.5,0,0,Math.PI);
-  ctx.strokeStyle='rgba(234,247,250,.62)';
-  ctx.lineWidth=1.25;
+  ctx.strokeStyle='rgba(234,247,250,.78)';
+  ctx.lineWidth=1.5;
   ctx.stroke();
+  ctx.beginPath();ctx.ellipse(0,0,33,4.5,0,.62,1.06);ctx.strokeStyle='rgba(241,250,255,.9)';ctx.stroke();
 }
 
 export function drawGlassBase(ctx:CanvasRenderingContext2D){
@@ -69,6 +70,7 @@ export function drawGlassBase(ctx:CanvasRenderingContext2D){
   ctx.fillStyle=lift;
   ctx.fillRect(-34,-34,68,68);
   ctx.restore();
+  const streak=ctx.createLinearGradient(0,16,0,124);streak.addColorStop(0,'rgba(255,255,255,0)');streak.addColorStop(.4,'rgba(255,255,255,.20)');streak.addColorStop(1,'rgba(255,255,255,0)');ctx.fillStyle=streak;ctx.fillRect(8,16,3,108);
 }
 
 export function drawGlassEdge(ctx:CanvasRenderingContext2D){
@@ -111,3 +113,5 @@ function artwork(draw:(ctx:CanvasRenderingContext2D)=>void,surface=false){
   const ctx=canvas.getContext('2d')!;ctx.save();ctx.scale(2,2);if(!surface)ctx.translate(90,36);draw(ctx);ctx.restore();return canvas;
 }
 export function makeGlassArtwork(){return{shadow:artwork(drawBodyShadow),rim:artwork(drawGlassRim),base:artwork(drawGlassBase,true),edge:artwork(drawGlassEdge,true),reflection:artwork(drawGlassShine,true)};}
+export function makeRadialArtwork(){const canvas=document.createElement('canvas');canvas.width=canvas.height=128;const ctx=canvas.getContext('2d')!,g=ctx.createRadialGradient(64,64,0,64,64,64);g.addColorStop(0,'#ffffff');g.addColorStop(.3,'#ffffffb3');g.addColorStop(1,'#ffffff00');ctx.fillStyle=g;ctx.fillRect(0,0,128,128);return canvas;}
+export function makeSweepArtwork(){const canvas=document.createElement('canvas');canvas.width=canvas.height=128;const ctx=canvas.getContext('2d')!,g=ctx.createLinearGradient(0,0,128,0);g.addColorStop(0,'#ffffff00');g.addColorStop(.35,'#ffffff00');g.addColorStop(.5,'#ffffff');g.addColorStop(.65,'#ffffff00');g.addColorStop(1,'#ffffff00');ctx.fillStyle=g;ctx.fillRect(0,0,128,128);return canvas;}

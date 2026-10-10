@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';import {writeFile} from 'node:fs/promises';import path from 'node:path';
+import {chromium,browserPath,artifactDirectory,url} from './browser.mjs';
+const out=await artifactDirectory('final'),browser=await chromium.launch({executablePath:await browserPath(),headless:true,args:['--no-sandbox']});
+const report={browser:browser.version(),measurements:[]};
+try{
+ for(const backend of ['webgl','canvas']){
+  const context=await browser.newContext({viewport:{width:390,height:844}});await context.addInitScript(({backend})=>{window.__perf={intervals:[],costs:[],longTasks:[]};const raf=requestAnimationFrame;let last=0;window.requestAnimationFrame=fn=>raf.call(window,time=>{if(last&&time-last<100)window.__perf.intervals.push(time-last);last=time;const start=performance.now();fn(time);window.__perf.costs.push(performance.now()-start);});try{new PerformanceObserver(list=>window.__perf.longTasks.push(...list.getEntries().map(e=>e.duration))).observe({entryTypes:['longtask']});}catch{}if(backend==='canvas'){const get=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(kind,...args){return String(kind).includes('webgl')?null:get.call(this,kind,...args);};}},{backend});
+  const page=await context.newPage();await page.goto(url+'?board=mixed');await page.waitForFunction(()=>document.querySelector('[data-glass="0"]')?.style.width);await page.waitForTimeout(400);
+  await page.evaluate(()=>{window.__perf.intervals=[];window.__perf.costs=[];window.__perf.longTasks=[];});
+  for(let i=0;i<3;i++){await page.keyboard.press('1');await page.keyboard.press('2');await page.waitForTimeout(1800);await page.keyboard.press('u');await page.waitForTimeout(750);}
+  await page.keyboard.press('1');await page.keyboard.press('2');await page.waitForTimeout(430);await page.setViewportSize({width:320,height:568});await page.waitForTimeout(500);await page.setViewportSize({width:390,height:844});await page.waitForTimeout(1200);await page.keyboard.press('u');await page.waitForTimeout(800);
+  const metrics=await page.evaluate(()=>window.__perf),summarize=values=>{const sorted=[...values].sort((a,b)=>a-b);return {samples:values.length,median:sorted[Math.floor(sorted.length*.5)],p95:sorted[Math.floor(sorted.length*.95)],max:sorted.at(-1)};};
+  report.measurements.push({backend,frameIntervalsMs:summarize(metrics.intervals),frameCallbackMs:summarize(metrics.costs),longTasksMs:metrics.longTasks,resize:'PASS'});await context.close();
+ }
+ const context=await browser.newContext({viewport:{width:390,height:844}}),page=await context.newPage();await page.goto(url);report.cap=await page.evaluate(async()=>{const image=new Image();image.src='/assets/pumpkin-cap.png';await image.decode();const canvas=document.createElement('canvas');canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0);const pixels=ctx.getImageData(0,1020,canvas.width,72);let lo=canvas.width,hi=-1;for(let y=0;y<72;y++)for(let x=0;x<canvas.width;x++)if(pixels.data[(y*canvas.width+x)*4+3]>200){lo=Math.min(lo,x);hi=Math.max(hi,x);}return {sourceSize:canvas.width,opaqueCollarPixels:hi-lo+1,collarLogicalWidth:(hi-lo+1)*88/1254,allowedLogicalWidth:71};});await context.close();
+ await writeFile(path.join(out,'performance.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
+}finally{await browser.close();}

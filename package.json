@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5179 --strictPort",
     "build": "tsc -p tsconfig.json && vite build",
+    "test": "node --experimental-strip-types --test tests/*.test.mts",
+    "verify:gameplay": "node scripts/verify-gameplay.mjs",
     "preview": "vite preview --host 127.0.0.1 --port 5180 --strictPort"
   },
   "dependencies": {

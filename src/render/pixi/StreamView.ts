@@ -1,13 +1,13 @@
 import {Container,MeshSimple,Texture} from 'pixi.js';
 import {COLORS} from '../../core/constants.ts';
 import type {StreamFrame} from '../../core/RenderFrame.ts';
-import {makeStreamHaloTexture} from './assets.ts';
+import {makeStreamHaloTexture,releaseTexture} from './assets.ts';
 
 const CURVE_SEGMENTS=32,CURVE_SAMPLES=CURVE_SEGMENTS+1;
 
 function colorWidth(t:number){
   const s=t<.5?t*2:(t-.5)*2,e=s*s*(3-2*s);
-  return t<.5?4.8-1.2*e:3.6+.8*e;
+  return t<.5?7-1.7*e:5.3+1.2*e;
 }
 
 class CurveStroke{
@@ -33,7 +33,7 @@ class CurveStroke{
   update(center:Float64Array,normals:Float64Array,color:string,alpha:number,widthScale:number){
     for(let i=0;i<CURVE_SAMPLES;i++){
       const p=i*2,o=i*4,t=i/CURVE_SEGMENTS;
-      const width=this.kind==='halo'?40:this.kind==='core'?1.15:colorWidth(t);
+      const width=this.kind==='halo'?44:this.kind==='core'?1.6:colorWidth(t);
       const half=width*widthScale*.5,nx=normals[p]*half,ny=normals[p+1]*half;
       this.vertices[o]=center[p]+nx;this.vertices[o+1]=center[p+1]+ny;
       this.vertices[o+2]=center[p]-nx;this.vertices[o+3]=center[p+1]-ny;
@@ -57,7 +57,7 @@ export class StreamView{
   destroy(){
     if(this.destroyed)return;this.destroyed=true;
     this.halo.destroy();this.colorStroke.destroy();this.core.destroy();
-    this.root.destroy();this.haloTexture.destroy(true);
+    this.root.destroy();releaseTexture(this.haloTexture);
   }
 
   update(stream:StreamFrame|null){
@@ -65,15 +65,15 @@ export class StreamView{
     this.root.visible=true;
     const sx=stream.start.x,sy=stream.start.y,cx=stream.control.x,cy=stream.control.y,ex=stream.end.x,ey=stream.end.y;
     for(let i=0;i<CURVE_SAMPLES;i++){
-      const t=stream.reveal*i/CURVE_SEGMENTS,mt=1-t,p=i*2;
+      const t=stream.release+(stream.reveal-stream.release)*i/CURVE_SEGMENTS,mt=1-t,p=i*2;
       this.center[p]=mt*mt*sx+2*mt*t*cx+t*t*ex;
       this.center[p+1]=mt*mt*sy+2*mt*t*cy+t*t*ey;
       const tx=2*mt*(cx-sx)+2*t*(ex-cx),ty=2*mt*(cy-sy)+2*t*(ey-cy),length=Math.hypot(tx,ty)||1;
       this.normals[p]=-ty/length;this.normals[p+1]=tx/length;
     }
     const color=COLORS[stream.color];
-    this.halo.update(this.center,this.normals,color,stream.alpha*.38,stream.widthScale);
+    this.halo.update(this.center,this.normals,color,stream.alpha*.30,stream.widthScale);
     this.colorStroke.update(this.center,this.normals,color,stream.alpha,stream.widthScale);
-    this.core.update(this.center,this.normals,'#ffffff',stream.alpha*.30,stream.widthScale);
+    this.core.update(this.center,this.normals,'#ffffff',stream.alpha*.42,stream.widthScale);
   }
 }

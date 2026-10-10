@@ -1,7 +1,7 @@
 import {smooth} from './geometry.ts';
 import type {CapFrame,CompletionFrame} from './RenderFrame.ts';
 
-export const CAP_ENTER_MS=450,CAP_EXIT_MS=125,CAP_SEAT_Y=16,CAP_FIRST_IMPACT_MS=210,COMPLETION_FX_MS=750;
+export const CAP_ENTER_MS=450,CAP_EXIT_MS=180,CAP_SEAT_Y=16,CAP_FIRST_IMPACT_MS=210,COMPLETION_FX_MS=750;
 const DROP_HEIGHT=45,GRAVITY=2*DROP_HEIGHT/(CAP_FIRST_IMPACT_MS/1000)**2,RESTITUTION=.4;
 const IMPACT_VELOCITY=GRAVITY*CAP_FIRST_IMPACT_MS/1000;
 const FIRST_BOUNCE_VELOCITY=IMPACT_VELOCITY*RESTITUTION,SECOND_BOUNCE_VELOCITY=FIRST_BOUNCE_VELOCITY*RESTITUTION;
@@ -32,7 +32,7 @@ export function sampleCompletion(motion:CompletionMotion|null,now:number,out:Com
     const p=out.particles[i],q=t/life;
     p.visible=true;p.bubble=false;p.x=side*(8+lane*6+(18+lane*12)*seconds);
     p.y=-2+(lane%2)*3-(50+lane*15)*seconds+50*seconds*seconds;
-    p.radius=(1.8+lane*.15)*(1-.55*q);p.alpha=.9*(1-q);
+    p.radius=1.25*(1.8+lane*.15)*(1-.55*q);p.alpha=.9*(1-q);
   }
   for(let i=0;i<4;i++){
     const life=430+i*55;
@@ -52,7 +52,7 @@ export function sampleCap(complete:boolean,motion:CapMotion|null,now:number,out:
   if(motion.kind==='exit'){
     if(elapsed>=CAP_EXIT_MS){out.visible=false;return out;}
     const p=smooth(elapsed/CAP_EXIT_MS);
-    out.visible=true;out.y=motion.from.y-4*p;out.scaleX=motion.from.scaleX*(1-.07*p);out.scaleY=motion.from.scaleY*(1-.07*p);out.rotation=motion.from.rotation*(1-p);out.alpha=motion.from.alpha*(1-p);
+    out.visible=true;out.y=motion.from.y-9*p;out.scaleX=motion.from.scaleX*(1-.12*p);out.scaleY=motion.from.scaleY*(1-.12*p);out.rotation=motion.from.rotation*(1-p);out.alpha=motion.from.alpha*(1-p);
     return out;
   }
   out.visible=true;

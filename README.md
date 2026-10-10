@@ -21,7 +21,7 @@ A nontrivial two-color water sort with only two vessels, capacity four and both 
 ## Controls
 
 - Tap glass to select a source and destination; desktop keys `1` and `2`.
-- Undo: medallion or `U`; Reset: press and hold the Reset medallion for 600 ms or press `R` twice within two seconds.
+- Undo: medallion or `U`; Reset: press and hold the Reset medallion for 800 ms or press `R` twice within two seconds. An untouched board reports “Already at start.”
 - Hint: medallion or `H`; Skip: existing **Coming later** UI only (no destination level).
 - Settings: animated brass/glass casement with **Sound**, **Music**, **Vibration** and **Motion** preferences; Resume Game closes it.
 - Audio must be unlocked by interaction. Music uses the tracked `public/assets/moonlit-ambient.wav`. Haptics require a browser/device supporting `navigator.vibrate`; desktop browsers usually cannot vibrate.
@@ -33,4 +33,4 @@ Claude should improve **gameplay HUD + gameplay Settings visuals and motion** us
 
 ## Verification
 
-Run `npm run build`. A fresh build/browser acceptance check should be performed locally before judging this branch as production-ready. This review branch intentionally excludes the campaign, verification suite, non-game screens and benchmark artifacts.
+Run `npm run build` and `npm test`. With a preview running on a separate port, run `npm run verify:gameplay`; set `STILLLIGHT_URL` and `CHROMIUM_PATH` when needed. Browser checks exercise both fixtures and WebGL/Canvas at 320×568, 390×844 and 430×932. Captures remain under ignored `artifacts/verification/`. The demo excludes the campaign and non-game screens; desktop checks do not qualify physical Android frame rate, haptic feel or audio taste.

@@ -1,0 +1,59 @@
+import assert from 'node:assert/strict';
+import {writeFile} from 'node:fs/promises';
+import path from 'node:path';
+import {chromium,browserPath,artifactDirectory,url} from './browser.mjs';
+const out=await artifactDirectory('final'),browser=await chromium.launch({executablePath:await browserPath(),headless:true,args:['--no-sandbox']});
+const report={browser:browser.version(),url,cases:[],limitations:['Desktop Chromium; no physical Android FPS or haptic-feel measurement.']};
+async function instrument(context,canvas=false){
+ await context.addInitScript(({canvas})=>{
+  window.__qa={frames:0,times:[],oscillators:0,contexts:[],sources:[],vibrations:[]};
+  const raf=window.requestAnimationFrame;window.requestAnimationFrame=callback=>raf.call(window,time=>{window.__qa.frames++;window.__qa.times.push(time);callback(time);});
+  if(canvas){const get=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(type,...args){return String(type).includes('webgl')?null:get.call(this,type,...args);};}
+  const AC=window.AudioContext;
+  if(AC)window.AudioContext=class extends AC{constructor(...args){super(...args);window.__qa.contexts.push(this);}createOscillator(){window.__qa.oscillators++;return super.createOscillator();}createBufferSource(){const source=super.createBufferSource(),start=source.start;source.start=function(...args){window.__qa.sources.push({loop:source.loop,duration:source.buffer?.duration??0});return start.apply(source,args);};return source;}};
+  if(typeof navigator.vibrate==='function'){const vibrate=navigator.vibrate.bind(navigator);navigator.vibrate=pattern=>{window.__qa.vibrations.push(pattern);return vibrate(pattern);};}
+ },{canvas});
+}
+async function ready(page,query=''){await page.goto(url+query);await page.waitForFunction(()=>document.querySelector('[data-glass="0"]')?.style.width);await page.waitForTimeout(300);}
+async function tap(page,selector){const box=await page.locator(selector).boundingBox();assert.ok(box,selector);await page.mouse.click(box.x+box.width/2,box.y+box.height/2);}
+async function labels(page){return page.locator('[data-glass]').evaluateAll(buttons=>buttons.map(b=>b.getAttribute('aria-label')));}
+async function capture(page,name){await page.screenshot({path:path.join(out,name+'.png')});}
+async function bounds(page,width){return page.evaluate(width=>{
+ const root=document.querySelector('.atelier').getBoundingClientRect(),buttons=[...document.querySelectorAll('.claude-ui button,.hit-glasses button,.result button')].filter(b=>b.getBoundingClientRect().width>0&&!b.closest('[hidden]'));
+ const texts=[];const walker=document.createTreeWalker(document.querySelector('.atelier'),NodeFilter.SHOW_TEXT);let node;while(node=walker.nextNode()){const el=node.parentElement;if(node.textContent.trim()&&el&&!el.closest('[hidden]')&&el.getBoundingClientRect().width>0&&getComputedStyle(el).visibility!=='hidden')texts.push({text:node.textContent.trim(),font:parseFloat(getComputedStyle(el).fontSize)});}
+ return {stage:root.width,controls:buttons.map(b=>{const r=b.getBoundingClientRect();return {label:b.getAttribute('aria-label')??b.textContent.trim(),width:r.width,height:r.height,left:r.left,right:r.right,bottom:r.bottom};}),texts,requested:width};
+ },width);}
+try{
+ for(const backend of ['webgl','canvas'])for(const [width,height] of [[320,568],[390,844],[430,932]]){
+  const context=await browser.newContext({viewport:{width,height},deviceScaleFactor:1});await instrument(context,backend==='canvas');const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));const prefix=`${backend}-${width}-${height}`;
+  await ready(page);const actual=await page.evaluate(()=>{const c=document.querySelector('#pixi-host canvas');return c.getContext('webgl2')||c.getContext('webgl')?'webgl':'canvas';});assert.equal(actual,backend);
+  const idleStart=await page.evaluate(()=>window.__qa.frames);await page.waitForTimeout(350);assert.equal(await page.evaluate(()=>window.__qa.frames),idleStart,'Idle game RAF');assert.equal(await page.evaluate(()=>window.__qa.oscillators),0,'Audio before gesture');
+  const geometry=await bounds(page,width);assert.equal(geometry.stage,width);for(const b of geometry.controls){assert.ok(b.width>=43.9&&b.height>=43.9,JSON.stringify(b));assert.ok(b.left>=-1&&b.right<=width+1);}assert.ok(geometry.texts.every(t=>t.font>=9),JSON.stringify(geometry.texts));await capture(page,prefix+'-idle');
+  await tap(page,'[data-hud="restart"]');assert.equal(await page.locator('[data-hud="restart"] .hold-toast').textContent(),'ALREADY AT START');assert.equal(await page.locator('.holding').count(),0);
+  await tap(page,'[data-hud="skip"]');assert.equal(await page.locator('[data-hud="skip"] .hold-ring').count(),0);assert.match(await page.locator('.skip-notice').textContent(),/COMING LATER/);
+  await tap(page,'[data-hud="hint"]');assert.equal(await page.locator('[data-hint-source="true"]').count(),1);assert.equal(await page.locator('[data-hint-target="true"]').count(),1);await page.waitForTimeout(350);await capture(page,prefix+'-hint');
+  await tap(page,'[data-glass="0"]');await page.waitForTimeout(230);await capture(page,prefix+'-selected');await tap(page,'[data-glass="0"]');await page.waitForTimeout(250);assert.equal(await page.locator('[data-glass="0"]').getAttribute('aria-pressed'),'false');
+  await tap(page,'[data-glass="0"]');await tap(page,'[data-glass="1"]');await page.waitForTimeout(460);await capture(page,prefix+'-pour');
+  await page.waitForFunction(()=>!document.querySelector('.result').hidden);await page.waitForTimeout(650);assert.match(await page.locator('.status').textContent(),/complete/);assert.equal(await page.locator('.result-stars span').count(),3);await capture(page,prefix+'-complete');
+  await tap(page,'[data-hud="settings"]');await page.waitForTimeout(600);assert.equal(await page.locator('.claude-settings').getAttribute('aria-modal'),'true');assert.equal(await page.locator('.game-slot').getAttribute('inert'),'');await capture(page,prefix+'-settings');
+  const panelBounds=await bounds(page,width);assert.ok(panelBounds.texts.every(t=>t.font>=9));for(const b of panelBounds.controls)assert.ok(b.width>=43.9&&b.height>=43.9,JSON.stringify(b));
+  await page.keyboard.press('Tab');assert.equal(await page.evaluate(()=>!!document.activeElement.closest('.claude-settings')),true);await page.keyboard.press('Escape');await page.waitForTimeout(320);await tap(page,'#replay-demo');await page.waitForTimeout(1100);assert.equal(await page.locator('.result').getAttribute('hidden'),'');assert.match((await labels(page))[0],/3 units/);
+  await ready(page,'?board=mixed');const pristine=await labels(page);assert.match(await page.locator('.status').textContent(),/Not a solvable level/);
+  await tap(page,'[data-glass="1"]');await tap(page,'[data-glass="0"]');await page.waitForTimeout(220);assert.equal(await page.locator('.medallion.role-undo').getAttribute('aria-disabled'),'true');await capture(page,prefix+'-mixed-pour');await page.waitForTimeout(1500);assert.equal(await page.locator('.result').getAttribute('hidden'),'');
+  await tap(page,'[data-hud="undo"]');await page.waitForTimeout(750);assert.deepEqual(await labels(page),pristine);
+  await tap(page,'[data-glass="0"]');await tap(page,'[data-glass="1"]');await page.waitForTimeout(120);await tap(page,'[data-glass="0"]');await page.waitForTimeout(1600);assert.equal(await page.locator('[data-glass="0"]').getAttribute('aria-pressed'),'true','Buffered tap');await tap(page,'[data-glass="1"]');await page.waitForTimeout(210);await capture(page,prefix+'-invalid');await page.waitForTimeout(300);
+  const box=await page.locator('[data-hud="restart"]').boundingBox();await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.waitForTimeout(600);await capture(page,prefix+'-reset-hold');await page.mouse.up();assert.notDeepEqual(await labels(page),pristine,'Early hold must not reset');
+  await page.mouse.down();await page.waitForTimeout(900);await page.mouse.up();await page.waitForTimeout(600);assert.deepEqual(await labels(page),pristine);
+  assert.deepEqual(errors,[]);report.cases.push({backend,width,height,status:'PASS',idleRafDelta:0,controls:geometry.controls.length,errors});await context.close();console.log(`PASS ${prefix}`);
+ }
+ // Independent settings, persisted OFF states, actual audio engine and dispatch observation.
+ const context=await browser.newContext({viewport:{width:390,height:844}});await instrument(context);const page=await context.newPage();await ready(page,'?board=mixed');await tap(page,'[data-hud="settings"]');await page.waitForTimeout(650);
+ await tap(page,'[data-preference="sound"]');await tap(page,'[data-preference="haptics"]');await page.waitForTimeout(200);const muted=await page.evaluate(()=>({osc:window.__qa.oscillators,vib:window.__qa.vibrations.length,music:window.__qa.sources.filter(s=>s.loop&&s.duration>30).length}));assert.ok(muted.music>=1,'Music independently unlocked');
+ await capture(page,'settings-off-moon');await page.keyboard.press('Escape');await page.waitForTimeout(320);await tap(page,'[data-glass="0"]');await tap(page,'[data-glass="1"]');await page.waitForTimeout(1600);const after=await page.evaluate(()=>({osc:window.__qa.oscillators,vib:window.__qa.vibrations.length}));assert.equal(after.osc,muted.osc);assert.equal(after.vib,muted.vib);
+ await page.reload();await page.waitForFunction(()=>document.querySelector('[data-glass="0"]')?.style.width);await tap(page,'[data-hud="settings"]');await page.waitForTimeout(650);assert.equal(await page.locator('[data-preference="sound"]').getAttribute('aria-checked'),'false');assert.equal(await page.locator('[data-preference="music"]').getAttribute('aria-checked'),'true');assert.equal(await page.locator('[data-preference="haptics"]').getAttribute('aria-checked'),'false');await context.close();report.cases.push({name:'independent feedback/preferences',status:'PASS'});
+ for(const backend of ['webgl','canvas']){
+  const context=await browser.newContext({viewport:{width:390,height:844},reducedMotion:'reduce'});await instrument(context,backend==='canvas');const page=await context.newPage();await ready(page);assert.equal(await page.locator('.atelier').getAttribute('data-motion'),'off');await tap(page,'[data-hud="settings"]');await page.waitForTimeout(250);assert.equal(await page.locator('[data-preference="motion"]').getAttribute('aria-disabled'),'true');await capture(page,backend+'-reduced-settings');await page.keyboard.press('Escape');await page.waitForTimeout(220);await tap(page,'[data-glass="0"]');await tap(page,'[data-glass="1"]');await page.waitForTimeout(520);await capture(page,backend+'-reduced-pour');await page.waitForFunction(()=>!document.querySelector('.result').hidden);await page.waitForTimeout(300);await capture(page,backend+'-reduced-complete');await context.close();report.cases.push({backend,name:'OS reduced motion',status:'PASS'});
+ }
+ const unsupported=await browser.newContext({viewport:{width:320,height:568}});await unsupported.addInitScript(()=>Object.defineProperty(navigator,'vibrate',{value:undefined}));const unsupportedPage=await unsupported.newPage();await ready(unsupportedPage);await tap(unsupportedPage,'[data-hud="settings"]');await unsupportedPage.waitForTimeout(650);assert.equal(await unsupportedPage.locator('[data-preference="haptics"] .switch-word').textContent(),'NOT SUPPORTED');await capture(unsupportedPage,'unsupported-vibration');await unsupported.close();report.cases.push({name:'unsupported vibration',status:'PASS'});
+ await writeFile(path.join(out,'verification.json'),JSON.stringify(report,null,2));console.log(`PASS ${report.cases.length} browser cases. Evidence: ${out}`);
+}catch(error){report.failure=error.stack;await writeFile(path.join(out,'verification.json'),JSON.stringify(report,null,2));throw error;}finally{await browser.close();}

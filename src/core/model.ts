@@ -6,9 +6,9 @@ import type {RenderFrame} from './RenderFrame.ts';
 export class StilllightModel extends BaseStilllightModel{
   private undoSurfaceOwnership=false;
 
-  override reset(){
+  override reset(now?:number){
     this.undoSurfaceOwnership=false;
-    super.reset();
+    super.reset(now);
   }
 
   override undo(now:number){
